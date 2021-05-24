@@ -19,10 +19,16 @@ type Access struct {
 	FeishuWebhookToken string `toml:"feishu-webhook-token"`
 }
 
+// Repo contains configuration options for Repo in PTAL command.
+type Repo struct {
+	Name    string   `toml:"name"`
+	PRQuery []string `toml:"pr-query"`
+}
+
 // PTAL contains configuration options for PTAL command.
 type PTAL struct {
-	Access  `toml:"access"`
-	PRQuery []string `toml:"pr-query"`
+	Access `toml:"access"`
+	Repos  []Repo `toml:"repos"`
 }
 
 // ReadConfig reads config for config file.
