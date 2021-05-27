@@ -10,7 +10,11 @@ ifeq (${ENABLE_VENDOR}, 1)
 GOVENDORFLAG := -mod=vendor
 endif
 
-GOBUILD := CGO_ENABLED=0 $(GO) build $(BUILD_FLAG) -trimpath $(GOVENDORFLAG)
+ifeq (${TRIMPATH}, 1)
+GOTRIMPATH := -trimpath
+endif
+
+GOBUILD := CGO_ENABLED=0 $(GO) build $(BUILD_FLAG) ${GOTRIMPATH} $(GOVENDORFLAG)
 
 build: tidy
 	$(GOBUILD) -ldflags '$(LDFLAGS)' -o bin/gh ./main.go

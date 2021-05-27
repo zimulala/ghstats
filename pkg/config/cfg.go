@@ -8,7 +8,8 @@ import (
 
 // Config contains configuration options.
 type Config struct {
-	PTAL `toml:"ptal"`
+	PTAL   `toml:"ptal"`
+	Review `toml:"review"`
 }
 
 // Access contains access token for services.
@@ -29,6 +30,14 @@ type Repo struct {
 type PTAL struct {
 	Access `toml:"access"`
 	Repos  []Repo `toml:"repos"`
+}
+
+type Review struct {
+	Access        `toml:"access"`
+	Repos         []Repo   `toml:"repos"`
+	LGTMComments  []string `toml:"lgtm-comments"`
+	BlockComments []string `toml:"block-comments"`
+	BlockUsers    []string `toml:"block-users"`
 }
 
 // ReadConfig reads config for config file.
