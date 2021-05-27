@@ -5,14 +5,12 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
-	"net/http"
 	"strings"
-	"time"
 
 	"github.com/google/go-github/v35/github"
 	"github.com/overvenus/ghstats/pkg/config"
 	"github.com/overvenus/ghstats/pkg/feishu"
+	"github.com/overvenus/ghstats/pkg/gh"
 	"github.com/overvenus/ghstats/pkg/markdown"
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2"
@@ -45,24 +43,11 @@ func newPTALCommand() *cobra.Command {
 			projects := make(map[string][]*github.IssuesSearchResult)
 			for _, proj := range cfg.Repos {
 				for _, query := range proj.PRQuery {
-				RATELIMIT:
-					for {
-						result, resp, err := client.Search.Issues(ctx, query, nil)
-						if err != nil {
-							if _, ok := err.(*github.RateLimitError); ok {
-								cmd.PrintErrln("hit rate limit, sleep 1s")
-								time.Sleep(time.Second)
-								continue RATELIMIT
-							}
-							return err
-						}
-						if resp.StatusCode != http.StatusOK {
-							body, _ := ioutil.ReadAll(resp.Body)
-							return fmt.Errorf("search issue error [%d] %s", resp.StatusCode, string(body))
-						}
-						projects[proj.Name] = append(projects[proj.Name], result)
-						break RATELIMIT
+					results, err := gh.SearchIssues(ctx, client, query)
+					if err != nil {
+						return err
 					}
+					projects[proj.Name] = append(projects[proj.Name], results...)
 				}
 			}
 			buf := strings.Builder{}

@@ -5,14 +5,12 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
-	"net/http"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/google/go-github/v35/github"
 	"github.com/overvenus/ghstats/pkg/config"
+	"github.com/overvenus/ghstats/pkg/gh"
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2"
 )
@@ -52,37 +50,12 @@ func newReviewCommand() *cobra.Command {
 				for _, query := range proj.PRQuery {
 					query = strings.TrimSpace(query)
 					query += updateRange
-
-					// Collect all pages.
-					opts := &github.SearchOptions{
-						ListOptions: github.ListOptions{Page: 0},
+					cmd.Println("query", query)
+					results, err := gh.SearchIssues(ctx, client, query)
+					if err != nil {
+						return err
 					}
-				PAGINATION:
-					for {
-					RATELIMIT:
-						for {
-							cmd.Println("query", query)
-							result, resp, err := client.Search.Issues(ctx, query, opts)
-							if err != nil {
-								if _, ok := err.(*github.RateLimitError); ok {
-									cmd.PrintErrln("hit rate limit, sleep 1s")
-									time.Sleep(time.Second)
-									continue RATELIMIT
-								}
-								return err
-							}
-							if resp.StatusCode != http.StatusOK {
-								body, _ := ioutil.ReadAll(resp.Body)
-								return fmt.Errorf("search issue error [%d] %s", resp.StatusCode, string(body))
-							}
-							projects[proj.Name] = append(projects[proj.Name], result)
-							if resp.NextPage == 0 {
-								break PAGINATION
-							}
-							opts.Page = resp.NextPage
-							break RATELIMIT
-						}
-					}
+					projects[proj.Name] = append(projects[proj.Name], results...)
 				}
 			}
 			todayTimestamp, _ := time.Parse(time.RFC3339, today)
@@ -217,46 +190,14 @@ func collectReviews(
 func collectPRLGTM(
 	ctx context.Context, c *reviewConfig, client *github.Client, issues []*github.Issue, reviews map[string]review,
 ) error {
-	getPRReviews := func(owner, repo string, number int) ([]*github.PullRequestReview, error) {
-		reviews := make([]*github.PullRequestReview, 0)
-		opts := &github.ListOptions{Page: 0}
-	PAGINATION:
-		for {
-		RATELIMIT:
-			for {
-				result, resp, err := client.PullRequests.ListReviews(
-					ctx, owner, repo, number, opts)
-				if err != nil {
-					if _, ok := err.(*github.RateLimitError); ok {
-						fmt.Fprintf(os.Stderr, "hit rate limit, sleep 1s")
-						time.Sleep(time.Second)
-						continue RATELIMIT
-					}
-					return nil, err
-				}
-				if resp.StatusCode != http.StatusOK {
-					body, _ := ioutil.ReadAll(resp.Body)
-					return nil, fmt.Errorf("issue list comments error [%d] %s", resp.StatusCode, string(body))
-				}
-				reviews = append(reviews, result...)
-				if resp.NextPage == 0 {
-					break PAGINATION
-				}
-				opts.Page = resp.NextPage
-				break RATELIMIT
-			}
-		}
-		return reviews, nil
-	}
-
 	for _, issue := range issues {
 		if !issue.IsPullRequest() {
 			continue
 		}
 		pr := issue
-		owner, repo := getRepository(pr.GetRepositoryURL())
+		owner, repo := gh.GetRepository(pr)
 		number := pr.GetNumber()
-		prReviews, err := getPRReviews(owner, repo, number)
+		prReviews, err := gh.PullRequestsListReviews(ctx, client, owner, repo, number)
 		if err != nil {
 			return err
 		}
@@ -282,79 +223,14 @@ func collectPRLGTM(
 func collectPRReviewComments(
 	ctx context.Context, c *reviewConfig, client *github.Client, issues []*github.Issue, reviews map[string]review,
 ) error {
-	getPRReviews := func(owner, repo string, number int) ([]*github.PullRequestReview, error) {
-		reviews := make([]*github.PullRequestReview, 0)
-		opts := &github.ListOptions{Page: 0}
-	PAGINATION:
-		for {
-		RATELIMIT:
-			for {
-				result, resp, err := client.PullRequests.ListReviews(
-					ctx, owner, repo, number, opts)
-				if err != nil {
-					if _, ok := err.(*github.RateLimitError); ok {
-						fmt.Fprintf(os.Stderr, "hit rate limit, sleep 1s")
-						time.Sleep(time.Second)
-						continue RATELIMIT
-					}
-					return nil, err
-				}
-				if resp.StatusCode != http.StatusOK {
-					body, _ := ioutil.ReadAll(resp.Body)
-					return nil, fmt.Errorf("issue list comments error [%d] %s", resp.StatusCode, string(body))
-				}
-				reviews = append(reviews, result...)
-				if resp.NextPage == 0 {
-					break PAGINATION
-				}
-				opts.Page = resp.NextPage
-				break RATELIMIT
-			}
-		}
-		return reviews, nil
-	}
-
-	getPRReviewComments := func(owner, repo string, number int, reviewID int64) ([]*github.PullRequestComment, error) {
-		comments := make([]*github.PullRequestComment, 0)
-		opts := &github.ListOptions{Page: 0}
-	PAGINATION:
-		for {
-		RATELIMIT:
-			for {
-				result, resp, err := client.PullRequests.ListReviewComments(
-					ctx, owner, repo, number, reviewID, opts)
-				if err != nil {
-					if _, ok := err.(*github.RateLimitError); ok {
-						fmt.Fprintf(os.Stderr, "hit rate limit, sleep 1s")
-						time.Sleep(time.Second)
-						continue RATELIMIT
-					}
-					return nil, err
-				}
-				if resp.StatusCode != http.StatusOK {
-					body, _ := ioutil.ReadAll(resp.Body)
-					return nil, fmt.Errorf("issue list comments error [%d] %s", resp.StatusCode, string(body))
-				}
-				comments = append(comments, result...)
-				if resp.NextPage == 0 {
-					break PAGINATION
-				}
-				opts.Page = resp.NextPage
-				break RATELIMIT
-			}
-		}
-		return comments, nil
-	}
-	_ = getPRReviewComments
-
 	for _, issue := range issues {
 		if !issue.IsPullRequest() {
 			continue
 		}
 		pr := issue
-		owner, repo := getRepository(pr.GetRepositoryURL())
+		owner, repo := gh.GetRepository(pr)
 		number := pr.GetNumber()
-		prReviews, err := getPRReviews(owner, repo, number)
+		prReviews, err := gh.PullRequestsListReviews(ctx, client, owner, repo, number)
 		if err != nil {
 			return err
 		}
@@ -367,7 +243,7 @@ func collectPRReviewComments(
 				continue
 			}
 
-			reviewComments, err := getPRReviewComments(owner, repo, number, *prReview.ID)
+			reviewComments, err := gh.PullRequestsListReviewComments(ctx, client, owner, repo, number, *prReview.ID)
 			if err != nil {
 				return err
 			}
@@ -385,45 +261,11 @@ func collectPRReviewComments(
 func collectIssueAndPRComments(
 	ctx context.Context, c *reviewConfig, client *github.Client, issues []*github.Issue, reviews map[string]review,
 ) error {
-	getComments := func(owner, repo string, number int) ([]*github.IssueComment, error) {
-		comments := make([]*github.IssueComment, 0)
-		opts := &github.IssueListCommentsOptions{
-			Since:       &c.startTimestamp,
-			ListOptions: github.ListOptions{Page: 0},
-		}
-	PAGINATION:
-		for {
-		RATELIMIT:
-			for {
-				result, resp, err := client.Issues.ListComments(
-					ctx, owner, repo, number, opts)
-				if err != nil {
-					if _, ok := err.(*github.RateLimitError); ok {
-						fmt.Fprintf(os.Stderr, "hit rate limit, sleep 1s")
-						time.Sleep(time.Second)
-						continue RATELIMIT
-					}
-					return nil, err
-				}
-				if resp.StatusCode != http.StatusOK {
-					body, _ := ioutil.ReadAll(resp.Body)
-					return nil, fmt.Errorf("issue list comments error [%d] %s", resp.StatusCode, string(body))
-				}
-				comments = append(comments, result...)
-				if resp.NextPage == 0 {
-					break PAGINATION
-				}
-				opts.Page = resp.NextPage
-				break RATELIMIT
-			}
-		}
-		return comments, nil
-	}
-
 	for _, issue := range issues {
-		owner, repo := getRepository(issue.GetRepositoryURL())
+		owner, repo := gh.GetRepository(issue)
 		number := issue.GetNumber()
-		comments, err := getComments(owner, repo, number)
+		comments, err := gh.IssuesListComments(
+			ctx, client, owner, repo, number, &c.startTimestamp)
 		if err != nil {
 			return err
 		}
@@ -489,9 +331,4 @@ func collectAddLabels(
 		}
 	}
 	return nil
-}
-
-func getRepository(repositoryURL string) (owner, repo string) {
-	parts := strings.Split(repositoryURL, "/")
-	return parts[len(parts)-2], parts[len(parts)-1]
 }
