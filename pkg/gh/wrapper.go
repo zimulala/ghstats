@@ -34,12 +34,10 @@ PAGINATION:
 	RATELIMIT:
 		for {
 			result, resp, err := client.Search.Issues(ctx, query, opts)
-			if err != nil {
-				if _, ok := err.(*github.RateLimitError); ok {
-					time.Sleep(time.Second)
-					continue RATELIMIT
-				}
+			if rateLimited, err := handleAPIError(err); err != nil {
 				return nil, err
+			} else if rateLimited {
+				continue
 			}
 			if resp.StatusCode != http.StatusOK {
 				body, _ := ioutil.ReadAll(resp.Body)
@@ -71,13 +69,10 @@ PAGINATION:
 		for {
 			result, resp, err := client.Issues.ListComments(
 				ctx, owner, repo, number, opts)
-			if err != nil {
-				if _, ok := err.(*github.RateLimitError); ok {
-					fmt.Fprintf(os.Stderr, "hit rate limit, sleep 1s")
-					time.Sleep(time.Second)
-					continue RATELIMIT
-				}
+			if rateLimited, err := handleAPIError(err); err != nil {
 				return nil, err
+			} else if rateLimited {
+				continue
 			}
 			if resp.StatusCode != http.StatusOK {
 				body, _ := ioutil.ReadAll(resp.Body)
@@ -107,13 +102,10 @@ PAGINATION:
 		for {
 			result, resp, err := client.PullRequests.ListReviews(
 				ctx, owner, repo, number, opts)
-			if err != nil {
-				if _, ok := err.(*github.RateLimitError); ok {
-					fmt.Fprintf(os.Stderr, "hit rate limit, sleep 1s")
-					time.Sleep(time.Second)
-					continue RATELIMIT
-				}
+			if rateLimited, err := handleAPIError(err); err != nil {
 				return nil, err
+			} else if rateLimited {
+				continue
 			}
 			if resp.StatusCode != http.StatusOK {
 				body, _ := ioutil.ReadAll(resp.Body)
@@ -143,18 +135,15 @@ PAGINATION:
 		for {
 			result, resp, err := client.PullRequests.ListReviewComments(
 				ctx, owner, repo, number, reviewID, opts)
-			if err != nil {
-				if _, ok := err.(*github.RateLimitError); ok {
-					fmt.Fprintf(os.Stderr, "hit rate limit, sleep 1s")
-					time.Sleep(time.Second)
-					continue RATELIMIT
-				}
+			if rateLimited, err := handleAPIError(err); err != nil {
 				return nil, err
+			} else if rateLimited {
+				continue
 			}
 			if resp.StatusCode != http.StatusOK {
 				body, _ := ioutil.ReadAll(resp.Body)
 				return nil, fmt.Errorf(
-					"issue pull request review comments error [%d] %s",
+					"pull request review comments error [%d] %s",
 					resp.StatusCode, string(body))
 			}
 			comments = append(comments, result...)
@@ -166,4 +155,17 @@ PAGINATION:
 		}
 	}
 	return comments, nil
+}
+
+func handleAPIError(err error) (rateLimited bool, e error) {
+	if err == nil {
+		return false, nil
+	}
+	if rateLimit, ok := err.(*github.RateLimitError); ok {
+		dur := rateLimit.Rate.Reset.Sub(time.Now()) + 100*time.Millisecond
+		fmt.Fprintf(os.Stderr, "hit rate limit, sleep %s", dur)
+		time.Sleep(dur)
+		return true, nil
+	}
+	return false, err
 }
