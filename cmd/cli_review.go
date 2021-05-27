@@ -206,6 +206,10 @@ func collectPRLGTM(
 			if c.isUserBlocked(*prReview.User.Login) {
 				continue
 			}
+			if *prReview.User.Login == *issue.User.Login {
+				// Do not count author's comments.
+				continue
+			}
 			if !c.withinTimeRange(*prReview.SubmittedAt) {
 				continue
 			}
@@ -237,6 +241,10 @@ func collectPRReviewComments(
 		// println("debug reviews", debug.PrettyFormat(prReviews))
 		for _, prReview := range prReviews {
 			if c.isUserBlocked(*prReview.User.Login) {
+				continue
+			}
+			if *prReview.User.Login == *issue.User.Login {
+				// Do not count author's comments.
 				continue
 			}
 			if !c.withinTimeRange(*prReview.SubmittedAt) {
@@ -272,6 +280,10 @@ func collectIssueAndPRComments(
 		// println("debug comments", debug.PrettyFormat(comments))
 		for _, comment := range comments {
 			if c.isUserBlocked(*comment.User.Login) {
+				continue
+			}
+			if *comment.User.Login == *issue.User.Login {
+				// Do not count author's comments.
 				continue
 			}
 			if c.isCommentBlocked(*comment.Body) {
