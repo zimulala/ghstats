@@ -5,12 +5,17 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/google/go-github/v35/github"
 	"github.com/overvenus/ghstats/pkg/config"
+	"github.com/overvenus/ghstats/pkg/debug"
+	"github.com/overvenus/ghstats/pkg/feishu"
 	"github.com/overvenus/ghstats/pkg/gh"
+	"github.com/overvenus/ghstats/pkg/markdown"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2"
 )
@@ -23,7 +28,7 @@ func init() {
 func newReviewCommand() *cobra.Command {
 	command := &cobra.Command{
 		Use:   "review",
-		Short: "Collect reviews ❤️",
+		Short: "Collect reviews 👍",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfgPath, err := cmd.Flags().GetString("config")
 			if err != nil {
@@ -39,18 +44,30 @@ func newReviewCommand() *cobra.Command {
 				&oauth2.Token{AccessToken: cfg.GithubToken},
 			)))
 
-			// Only collect 1 day review activity.
+			// Only collect 1 weekday review activity.
+			today := time.Now()
+			lastWeekday := time.Now()
+			switch today.Weekday() {
+			// 2-5, collect 24 hour review activity.
+			case time.Tuesday, time.Wednesday, time.Thursday, time.Friday:
+				lastWeekday = lastWeekday.Add(-24 * time.Hour)
+			// 6, collect past 2 day review activity.
+			case time.Saturday:
+				lastWeekday = lastWeekday.Add(-2 * 24 * time.Hour)
+			// 0-1, collect past 3 day review activity. 0: Firday, 1: Monday.
+			case time.Sunday, time.Monday:
+				lastWeekday = lastWeekday.Add(-3 * 24 * time.Hour)
+			}
+
 			// Date if formated in time.RFC3339.
 			// updated:2021-05-23T21:00:00+08:00..2021-05-24T21:00:00+08:00
-			today := time.Now().Format(time.RFC3339)
-			yesterday := time.Now().Add(-24 * time.Hour).Format(time.RFC3339)
-			updateRange := fmt.Sprintf(" updated:%s..%s", yesterday, today)
+			updateRange := fmt.Sprintf(" updated:%s..%s", lastWeekday.Format(time.RFC3339), today.Format(time.RFC3339))
 			projects := make(map[string][]*github.IssuesSearchResult)
 			for _, proj := range cfg.Repos {
 				for _, query := range proj.PRQuery {
 					query = strings.TrimSpace(query)
 					query += updateRange
-					cmd.Println("query", query)
+					log.Info("query: ", query)
 					results, err := gh.SearchIssues(ctx, client, query)
 					if err != nil {
 						return err
@@ -58,8 +75,8 @@ func newReviewCommand() *cobra.Command {
 					projects[proj.Name] = append(projects[proj.Name], results...)
 				}
 			}
-			todayTimestamp, _ := time.Parse(time.RFC3339, today)
-			yesterdayTimestamp, _ := time.Parse(time.RFC3339, yesterday)
+			todayTimestamp := today
+			yesterdayTimestamp := lastWeekday
 			reviews := make(map[string]review)
 			c := &reviewConfig{
 				lgtmComments:   cfg.LGTMComments,
@@ -68,7 +85,7 @@ func newReviewCommand() *cobra.Command {
 				startTimestamp: yesterdayTimestamp,
 				endTimestamp:   todayTimestamp,
 			}
-			// println("debug projests issues", debug.PrettyFormat(projects))
+			log.Debug("projests issues: ", debug.PrettyFormat(projects))
 			for repo, results := range projects {
 				_ = repo
 				for _, res := range results {
@@ -82,12 +99,40 @@ func newReviewCommand() *cobra.Command {
 				}
 			}
 
-			for user, review := range reviews {
-				cmd.Println(user, "reviews", fmt.Sprintf("%#v", review))
+			rs := reviewSlice{}
+			for user, r := range reviews {
+				rs = append(rs, struct {
+					review
+					user string
+				}{r, user})
 			}
-			return nil
-			// bot := feishu.WebhookBot(cfg.FeishuWebhookToken)
-			// return bot.SendMarkdownMessage(ctx, "PTAL ❤️", buf.String())
+			// Highest score ranks first.
+			sort.Sort(sort.Reverse(rs))
+
+			// To keep message short we only send top15 reviewer.
+			topN := 15
+			buf := strings.Builder{}
+			for i, r := range rs {
+				user, review := r.user, r.review
+				reviewStr := review.String()
+				if len(reviewStr) == 0 {
+					// The user does not review.
+					continue
+				}
+				userReview := fmt.Sprintf("%s: %s", user, review.String())
+				log.Info(userReview)
+				if i >= topN {
+					continue
+				}
+				buf.WriteString(markdown.Escape(userReview))
+				buf.WriteByte('\n')
+			}
+			if buf.Len() == 0 {
+				buf.WriteString("No reviews 😢")
+			}
+			log.Debug("reviews: ", buf.String())
+			bot := feishu.WebhookBot(cfg.FeishuWebhookToken)
+			return bot.SendMarkdownMessage(ctx, "Review Top 15 👍", buf.String())
 		},
 	}
 	return command
@@ -103,8 +148,57 @@ type review struct {
 	// How many issues does one create?
 	issueCreates int
 	// How many labels does one add?
-	addLabels int
+	labelAdds int
 }
+
+func (r *review) String() string {
+	parts := make([]string, 0)
+	if r.prLGTMs != 0 {
+		parts = append(parts, fmt.Sprintf("LGTM: %d", r.prLGTMs))
+	}
+	if r.prComments != 0 {
+		parts = append(parts, fmt.Sprintf("PR comments: %d", r.prComments))
+	}
+	if r.issueComments != 0 {
+		parts = append(parts, fmt.Sprintf("issue comments: %d", r.issueComments))
+	}
+	if r.issueCreates != 0 {
+		parts = append(parts, fmt.Sprintf("create issues: %d", r.issueCreates))
+	}
+	if r.labelAdds != 0 {
+		parts = append(parts, fmt.Sprintf("add lables: %d", r.labelAdds))
+	}
+	return strings.Join(parts, ", ")
+}
+
+func (r *review) score() float64 {
+	s := 1.0
+	if r.prLGTMs != 0 {
+		s += float64(r.prLGTMs) * 2.0
+	}
+	if r.prComments != 0 {
+		s += float64(r.prComments) * 1.0
+	}
+	if r.issueComments != 0 {
+		s += float64(r.issueComments) * 1.0
+	}
+	if r.issueCreates != 0 {
+		s += float64(r.issueCreates) * 2.0
+	}
+	if r.labelAdds != 0 {
+		s += float64(r.labelAdds) * 0.5
+	}
+	return s
+}
+
+type reviewSlice []struct {
+	review
+	user string
+}
+
+func (x reviewSlice) Len() int           { return len(x) }
+func (x reviewSlice) Less(i, j int) bool { return x[i].score() < x[j].score() }
+func (x reviewSlice) Swap(i, j int)      { x[i], x[j] = x[j], x[i] }
 
 type reviewConfig struct {
 	lgtmComments   []string
@@ -201,7 +295,7 @@ func collectPRLGTM(
 		if err != nil {
 			return err
 		}
-		// println("debug reviews", debug.PrettyFormat(prReviews))
+		log.Debug("LGTM: ", debug.PrettyFormat(prReviews))
 		for _, prReview := range prReviews {
 			if c.isUserBlocked(*prReview.User.Login) {
 				continue
@@ -238,7 +332,7 @@ func collectPRReviewComments(
 		if err != nil {
 			return err
 		}
-		// println("debug reviews", debug.PrettyFormat(prReviews))
+		log.Debug("reviews: ", debug.PrettyFormat(prReviews))
 		for _, prReview := range prReviews {
 			if c.isUserBlocked(*prReview.User.Login) {
 				continue
@@ -277,7 +371,7 @@ func collectIssueAndPRComments(
 		if err != nil {
 			return err
 		}
-		// println("debug comments", debug.PrettyFormat(comments))
+		log.Debug("comments: ", debug.PrettyFormat(comments))
 		for _, comment := range comments {
 			if c.isUserBlocked(*comment.User.Login) {
 				continue
@@ -331,15 +425,29 @@ func collectAddLabels(
 	ctx context.Context, c *reviewConfig, client *github.Client, issues []*github.Issue, reviews map[string]review,
 ) error {
 	for _, issue := range issues {
-		if c.isUserBlocked(*issue.User.Login) {
-			continue
+		owner, repo := gh.GetRepository(issue)
+		number := issue.GetNumber()
+		events, err := gh.IssuesListIssueEvents(ctx, client, owner, repo, number)
+		if err != nil {
+			return err
 		}
-		if c.withinTimeRange(*issue.CreatedAt) {
-			review := reviews[*issue.User.Login]
-			if !issue.IsPullRequest() {
-				review.issueCreates++
+		log.Debug("labels issue events: ", debug.PrettyFormat(events))
+		for _, event := range events {
+			if c.isUserBlocked(*event.Actor.Login) {
+				continue
 			}
-			reviews[*issue.User.Login] = review
+			if *event.Actor.Login == *issue.User.Login {
+				// Do not count author's label events.
+				continue
+			}
+			if *event.Event != "labeled" {
+				continue
+			}
+			if c.withinTimeRange(*event.CreatedAt) {
+				review := reviews[*event.Actor.Login]
+				review.labelAdds++
+				reviews[*event.Actor.Login] = review
+			}
 		}
 	}
 	return nil

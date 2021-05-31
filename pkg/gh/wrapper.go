@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/google/go-github/v35/github"
+	log "github.com/sirupsen/logrus"
 )
 
 // GetRepository returns repository owner and name of the issue.
@@ -157,13 +157,46 @@ PAGINATION:
 	return comments, nil
 }
 
+// IssuesListIssueEvents wraps Issues.ListIssueEvents,
+// supports pagination and rate limit.
+func IssuesListIssueEvents(
+	ctx context.Context, client *github.Client, owner, repo string, number int,
+) ([]*github.IssueEvent, error) {
+	events := make([]*github.IssueEvent, 0)
+	opts := &github.ListOptions{Page: 0}
+PAGINATION:
+	for {
+	RATELIMIT:
+		for {
+			result, resp, err := client.Issues.ListIssueEvents(
+				ctx, owner, repo, number, opts)
+			if rateLimited, err := handleAPIError(err); err != nil {
+				return nil, err
+			} else if rateLimited {
+				continue
+			}
+			if resp.StatusCode != http.StatusOK {
+				body, _ := ioutil.ReadAll(resp.Body)
+				return nil, fmt.Errorf("issue list comments error [%d] %s", resp.StatusCode, string(body))
+			}
+			events = append(events, result...)
+			if resp.NextPage == 0 {
+				break PAGINATION
+			}
+			opts.Page = resp.NextPage
+			break RATELIMIT
+		}
+	}
+	return events, nil
+}
+
 func handleAPIError(err error) (rateLimited bool, e error) {
 	if err == nil {
 		return false, nil
 	}
 	if rateLimit, ok := err.(*github.RateLimitError); ok {
 		dur := rateLimit.Rate.Reset.Sub(time.Now()) + 100*time.Millisecond
-		fmt.Fprintf(os.Stderr, "hit rate limit, sleep %s", dur)
+		log.Warnf("hit rate limit, sleep %s", dur)
 		time.Sleep(dur)
 		return true, nil
 	}
