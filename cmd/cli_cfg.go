@@ -24,6 +24,9 @@ func newConfigCommand() *cobra.Command {
 				PTAL: config.PTAL{
 					Repos: []config.Repo{{}},
 				},
+				Review: config.Review{
+					Repos: []config.Repo{{}},
+				},
 			}
 			buf := &bytes.Buffer{}
 			encoder := toml.NewEncoder(buf)
