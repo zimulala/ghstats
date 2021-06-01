@@ -142,7 +142,7 @@ func newReviewCommand() *cobra.Command {
 			}
 			log.Debug("reviews: ", buf.String())
 			bot := feishu.WebhookBot(cfg.FeishuWebhookToken)
-			return bot.SendMarkdownMessage(ctx, fmt.Sprintf("Review Top %d 👍", topN), buf.String())
+			return bot.SendMarkdownMessage(ctx, fmt.Sprintf("Review Top %d 👍", topN), buf.String(), feishu.TitleColorGreen)
 		},
 	}
 	return command

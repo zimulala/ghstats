@@ -76,7 +76,7 @@ func newPTALCommand() *cobra.Command {
 				return nil
 			}
 			bot := feishu.WebhookBot(cfg.FeishuWebhookToken)
-			return bot.SendMarkdownMessage(ctx, "PTAL ❤️", buf.String())
+			return bot.SendMarkdownMessage(ctx, "PTAL ❤️", buf.String(), feishu.TitleColorWathet)
 		},
 	}
 	return command

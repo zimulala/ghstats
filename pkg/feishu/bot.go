@@ -9,6 +9,36 @@ import (
 	"strings"
 )
 
+// TitleColor defines feishu message title color.
+type TitleColor string
+
+const (
+	// TitleColorBlue Blue.
+	TitleColorBlue TitleColor = "blue"
+	// TitleColorWathet Wathet
+	TitleColorWathet TitleColor = "wathet"
+	// TitleColorTurquoise Turquoise
+	TitleColorTurquoise TitleColor = "turquoise"
+	// TitleColorGreen Green
+	TitleColorGreen TitleColor = "green"
+	// TitleColorYellow Yellow
+	TitleColorYellow TitleColor = "yellow"
+	// TitleColorOrange Orange
+	TitleColorOrange TitleColor = "orange"
+	// TitleColorRed Red
+	TitleColorRed TitleColor = "red"
+	// TitleColorCarmine Carmine
+	TitleColorCarmine TitleColor = "carmine"
+	// TitleColorViolet Violet
+	TitleColorViolet TitleColor = "violet"
+	// TitleColorPurple Purple
+	TitleColorPurple TitleColor = "purple"
+	// TitleColorIndigo Indigo
+	TitleColorIndigo TitleColor = "indigo"
+	// TitleColorGrey Grey
+	TitleColorGrey TitleColor = "grey"
+)
+
 // WebhookBot is a feishu webhook bot.
 type WebhookBot string
 
@@ -41,7 +71,7 @@ type WebhookBot string
 // }
 //
 // Source: https://open.feishu.cn/document/ukTMukTMukTM/ucTM5YjL3ETO24yNxkjN#4996824a
-func (bot WebhookBot) SendMarkdownMessage(ctx context.Context, title, msg string) error {
+func (bot WebhookBot) SendMarkdownMessage(ctx context.Context, title, msg string, titleColor TitleColor) error {
 	title1, err := json.Marshal(title)
 	if err != nil {
 		return err
@@ -62,7 +92,8 @@ func (bot WebhookBot) SendMarkdownMessage(ctx context.Context, title, msg string
 				"title": {
 					"tag": "plain_text",
 					"content": %s
-				}
+				},
+				"template":"%s"
 			},
 			"elements": [
 				{
@@ -74,7 +105,7 @@ func (bot WebhookBot) SendMarkdownMessage(ctx context.Context, title, msg string
 				}
 			]
 		}
-	}`, string(title1), string(msg1))
+	}`, string(title1), titleColor, string(msg1))
 	url := fmt.Sprintf("https://open.feishu.cn/open-apis/bot/v2/hook/%s", bot)
 	req, err := http.NewRequestWithContext(
 		ctx, http.MethodPost, url, strings.NewReader(payload))
