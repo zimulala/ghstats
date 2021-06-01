@@ -109,8 +109,8 @@ func newReviewCommand() *cobra.Command {
 			// Highest score ranks first.
 			sort.Sort(sort.Reverse(rs))
 
-			// To keep message short we only send top15 reviewer.
-			topN := 15
+			// To keep message short we only send top 5 reviewer.
+			topN := 5
 			buf := strings.Builder{}
 			for i, r := range rs {
 				user, review := r.user, r.review
@@ -119,20 +119,30 @@ func newReviewCommand() *cobra.Command {
 					// The user does not review.
 					continue
 				}
-				userReview := fmt.Sprintf("%s: %s", user, review.String())
+				trophy := fmt.Sprint("#", i+1)
+				switch i {
+				case 0:
+					trophy = "🏆"
+				case 1:
+					trophy = "🥈"
+				case 2:
+					trophy = "🥉"
+				}
+
+				userReview := fmt.Sprintf("%s **%s**\n%s\n\n",
+					markdown.Escape(trophy), markdown.Escape(user), markdown.Escape(review.String()))
 				log.Info(userReview)
 				if i >= topN {
 					continue
 				}
-				buf.WriteString(markdown.Escape(userReview))
-				buf.WriteByte('\n')
+				buf.WriteString(userReview)
 			}
 			if buf.Len() == 0 {
 				buf.WriteString("No reviews 😢")
 			}
 			log.Debug("reviews: ", buf.String())
 			bot := feishu.WebhookBot(cfg.FeishuWebhookToken)
-			return bot.SendMarkdownMessage(ctx, "Review Top 15 👍", buf.String())
+			return bot.SendMarkdownMessage(ctx, fmt.Sprintf("Review Top %d 👍", topN), buf.String())
 		},
 	}
 	return command
