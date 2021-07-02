@@ -85,7 +85,7 @@ func newReviewCommand() *cobra.Command {
 				startTimestamp: yesterdayTimestamp,
 				endTimestamp:   todayTimestamp,
 			}
-			log.Debug("projests issues: ", debug.PrettyFormat(projects))
+			log.Debug("projects issues: ", debug.PrettyFormat(projects))
 			for repo, results := range projects {
 				_ = repo
 				for _, res := range results {

@@ -25,7 +25,7 @@ func main() {
 			return funcName, fmt.Sprintf("%s:%d", path.Base(f.File), f.Line)
 		},
 	})
-	file, err := os.OpenFile("/tmp/ghstats.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	file, err := os.OpenFile("/tmp/ghstats.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o666)
 	if err == nil {
 		log.SetOutput(file)
 	} else {

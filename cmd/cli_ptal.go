@@ -53,18 +53,24 @@ func newPTALCommand() *cobra.Command {
 			buf := strings.Builder{}
 			// To keep message short, we only keep the most recent 5 PRs.
 			max := 5
+			count := 0
 			for repo, results := range projects {
 				prs := strings.Builder{}
 				for _, res := range results {
-					for j, issue := range res.Issues {
-						if j > max {
+					for _, issue := range res.Issues {
+						if count > max {
 							break
+						}
+						// do not find a unify label to identify "WIP" status, so just check the title for now
+						if strings.Contains(strings.ToLower(*issue.Title), "wip") {
+							continue
 						}
 						prs.WriteString(fmt.Sprintf("%s %s\n",
 							markdown.Link(fmt.Sprintf("#%d", *issue.Number), *issue.HTMLURL),
 							markdown.Escape(*issue.Title),
 						))
 					}
+					count++
 				}
 				if prs.Len() != 0 {
 					buf.WriteString(fmt.Sprintf("## %s\n", markdown.Escape(repo)))
