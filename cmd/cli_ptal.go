@@ -65,6 +65,10 @@ func newPTALCommand() *cobra.Command {
 						if strings.Contains(strings.ToLower(*issue.Title), "wip") {
 							continue
 						}
+						// So as to "DNM"
+						if strings.Contains(strings.ToLower(*issue.Title), "dnm") {
+							continue
+						}
 						prs.WriteString(fmt.Sprintf("%s %s\n",
 							markdown.Link(fmt.Sprintf("#%d", *issue.Number), *issue.HTMLURL),
 							markdown.Escape(*issue.Title),
