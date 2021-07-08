@@ -279,6 +279,7 @@ func collectReviews(
 		collectPRLGTM,
 		collectPRReviewComments,
 		collectIssueAndPRComments,
+		collectAddLabels,
 	}
 	for _, collect := range collectors {
 		err := collect(ctx, c, client, issues, reviews)
