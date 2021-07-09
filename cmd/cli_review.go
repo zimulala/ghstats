@@ -176,7 +176,7 @@ func (r *review) String() string {
 		parts = append(parts, fmt.Sprintf("create issues: %d", r.issueCreates))
 	}
 	if r.labelAdds != 0 {
-		parts = append(parts, fmt.Sprintf("add lables: %d", r.labelAdds))
+		parts = append(parts, fmt.Sprintf("add labels: %d", r.labelAdds))
 	}
 	return strings.Join(parts, ", ")
 }
