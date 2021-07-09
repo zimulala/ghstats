@@ -38,6 +38,7 @@ type Review struct {
 	LGTMComments  []string `toml:"lgtm-comments"`
 	BlockComments []string `toml:"block-comments"`
 	BlockUsers    []string `toml:"block-users"`
+	BlockLabels   []string `toml:"block-labels"`
 }
 
 // ReadConfig reads config for config file.

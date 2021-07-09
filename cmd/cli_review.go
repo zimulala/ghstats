@@ -82,6 +82,7 @@ func newReviewCommand() *cobra.Command {
 				lgtmComments:   cfg.LGTMComments,
 				blockComments:  cfg.BlockComments,
 				blockUsers:     cfg.BlockUsers,
+				blockLabels:    cfg.BlockLabels,
 				startTimestamp: yesterdayTimestamp,
 				endTimestamp:   todayTimestamp,
 			}
@@ -214,6 +215,7 @@ type reviewConfig struct {
 	lgtmComments   []string
 	blockComments  []string
 	blockUsers     []string
+	blockLabels    []string
 	startTimestamp time.Time
 	endTimestamp   time.Time
 }
@@ -226,6 +228,15 @@ func (c *reviewConfig) withinTimeRange(ts time.Time) bool {
 func (c *reviewConfig) isUserBlocked(userLogin string) bool {
 	for i := range c.blockUsers {
 		if c.blockUsers[i] == userLogin {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *reviewConfig) isLabelBlocked(labelName string) bool {
+	for i := range c.blockLabels {
+		if c.blockLabels[i] == labelName {
 			return true
 		}
 	}
@@ -452,6 +463,9 @@ func collectAddLabels(
 				continue
 			}
 			if *event.Event != "labeled" {
+				continue
+			}
+			if c.isLabelBlocked(*event.Label.Name) {
 				continue
 			}
 			if c.withinTimeRange(*event.CreatedAt) {
