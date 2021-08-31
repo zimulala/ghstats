@@ -1,0 +1,126 @@
+[ptal]
+[ptal.access]
+github-token = "<TOKEN>"
+# Test bot
+feishu-webhook-token = "<TOKEN>"
+
+[[ptal.repos]]
+name = "TiCDC"
+pr-query = [
+# Open CDC PR in pingcap/ticdc and tikv/tikv repo.
+# Excludes PRs that not ready.
+# Excludes PRs that ready to merge.
+# Excludes cherry-pick PRs.
+"""
+repo:pingcap/ticdc type:pr state:open \
+draft:false -label:do-not-merge/work-in-progress -label:do-not-merge/hold \
+-label:status/LGT2 -label:status/can-merge \
+-label:type/cherry-pick-for-release-5.0 -label:type/cherry-pick-for-release-4.0 \
+sort:created-desc
+""",
+"""
+repo:tikv/tikv type:pr state:open label:component/CDC \
+draft:false -label:do-not-merge/work-in-progress -label:do-not-merge/hold \
+-label:status/LGT2 -label:status/can-merge \
+-label:type/cherry-pick \
+sort:created-desc
+"""]
+
+[[ptal.repos]]
+name = "BRIE"
+pr-query = [
+# Open BRIE PR in pingcap/br and tikv/tikv repo.
+# Excludes PRs that not ready.
+# Excludes PRs that ready to merge.
+# Excludes cherry-pick PRs.
+"""
+repo:pingcap/br type:pr state:open \
+draft:false -label:do-not-merge/work-in-progress -label:do-not-merge/hold \
+-label:status/LGT2 -label:status/can-merge \
+-label:type/cherry-pick-for-release-5.0 -label:type/cherry-pick-for-release-4.0 \
+sort:created-desc
+""",
+"""
+repo:tikv/tikv type:pr state:open label:component/backup-restore \
+draft:false -label:do-not-merge/work-in-progress -label:do-not-merge/hold \
+-label:status/LGT2 -label:status/can-merge \
+-label:type/cherry-pick \
+sort:created-desc
+""",
+"""
+repo:pingcap/tidb type:pr state:open label:component/lightning,label:component/br \
+draft:false -label:do-not-merge/work-in-progress -label:do-not-merge/hold \
+-label:status/LGT2 -label:status/can-merge \
+sort:created-desc
+"""]
+
+[[ptal.repos]]
+name = "DM"
+pr-query = [
+# Open DM PR in pingcap/dm repo.
+# Excludes PRs that not ready.
+# Excludes PRs that ready to merge.
+# Excludes cherry-pick PRs.
+"""
+repo:pingcap/dm type:pr state:open \
+draft:false -label:do-not-merge/work-in-progress -label:do-not-merge/hold \
+-label:status/LGT2 -label:status/can-merge \
+-label:type/cherry-pick-for-release-2.0 -label:type/cherry-pick-for-release-1.0 \
+sort:created-desc
+"""]
+
+[review]
+lgtm-comments = [
+  "/lgtm",
+  "LGTM",
+]
+block-comments = [
+  "/run-",
+  "/merge",
+  "/rebuild",
+]
+block-users = [
+  "sre-bot",
+  "ti-chi-bot",
+  "ti-srebot",
+  "codecov-commenter",
+  "CLAassistant",
+]
+block-labels = [
+  "cherry-pick-approved",
+  "status/can-merge",
+]
+
+[review.access]
+github-token = "<TOKEN>"
+feishu-webhook-token = "<TOKEN>"
+
+[[review.repos]]
+name = "TiCDC"
+pr-query = [
+# Open CDC PR and issues in pingcap/ticdc and tikv/tikv repo.
+"""
+repo:pingcap/ticdc
+""",
+"""
+repo:tikv/tikv label:component/CDC
+"""]
+
+[[review.repos]]
+name = "BRIE"
+pr-query = [
+# Open BRIE PR and issues in pingcap/ticdc and tikv/tikv repo.
+"""
+repo:pingcap/br
+""",
+"""
+repo:tikv/tikv label:component/backup-restore
+"""]
+
+[[review.repos]]
+name = "DM"
+pr-query = [
+# Open MD PR and issues in pingcap/dn repo.
+"""
+repo:pingcap/dm
+"""]
