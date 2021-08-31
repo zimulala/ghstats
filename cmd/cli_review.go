@@ -32,7 +32,7 @@ func newReviewCommand() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Only collect 1 weekday review activity.
 			today := time.Now()
-			lastWeekday := time.Now()
+			lastWeekday := today
 			switch today.Weekday() {
 			// 2-5, collect 24 hour review activity.
 			case time.Tuesday, time.Wednesday, time.Thursday, time.Friday:
@@ -80,8 +80,10 @@ func reviewRange(cmd *cobra.Command, args []string, start, end time.Time) error 
 		&oauth2.Token{AccessToken: cfg.GithubToken},
 	)))
 
+	log.Info("review range", start, end)
+
 	reviews := make(map[string]review)
-	for next := (time.Time{}); !start.After(end); start = next {
+	for next := (time.Time{}); !(start.Equal(end) || start.After(end)); start = next {
 		next = start.Add(24 * time.Hour)
 
 		// Date if formated in time.RFC3339.
