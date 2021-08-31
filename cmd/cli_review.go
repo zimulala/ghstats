@@ -30,20 +30,6 @@ func newReviewCommand() *cobra.Command {
 		Use:   "review",
 		Short: "Collect reviews 👍",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfgPath, err := cmd.Flags().GetString("config")
-			if err != nil {
-				return err
-			}
-			cfg1, err := config.ReadConfig(cfgPath)
-			if err != nil {
-				return err
-			}
-			cfg := cfg1.Review
-			ctx := context.Background()
-			client := github.NewClient(oauth2.NewClient(ctx, oauth2.StaticTokenSource(
-				&oauth2.Token{AccessToken: cfg.GithubToken},
-			)))
-
 			// Only collect 1 weekday review activity.
 			today := time.Now()
 			lastWeekday := time.Now()
@@ -59,94 +45,130 @@ func newReviewCommand() *cobra.Command {
 				lastWeekday = lastWeekday.Add(-3 * 24 * time.Hour)
 			}
 
-			// Date if formated in time.RFC3339.
-			// updated:2021-05-23T21:00:00+08:00..2021-05-24T21:00:00+08:00
-			updateRange := fmt.Sprintf(" updated:%s..%s", lastWeekday.Format(time.RFC3339), today.Format(time.RFC3339))
-			projects := make(map[string][]*github.IssuesSearchResult)
-			for _, proj := range cfg.Repos {
-				for _, query := range proj.PRQuery {
-					query = strings.TrimSpace(query)
-					query += updateRange
-					log.Info("query: ", query)
-					results, err := gh.SearchIssues(ctx, client, query)
-					if err != nil {
-						return err
-					}
-					projects[proj.Name] = append(projects[proj.Name], results...)
-				}
-			}
-			todayTimestamp := today
-			yesterdayTimestamp := lastWeekday
-			reviews := make(map[string]review)
-			c := &reviewConfig{
-				lgtmComments:   cfg.LGTMComments,
-				blockComments:  cfg.BlockComments,
-				blockUsers:     cfg.BlockUsers,
-				blockLabels:    cfg.BlockLabels,
-				startTimestamp: yesterdayTimestamp,
-				endTimestamp:   todayTimestamp,
-			}
-			log.Debug("projects issues: ", debug.PrettyFormat(projects))
-			for repo, results := range projects {
-				_ = repo
-				for _, res := range results {
-					if len(res.Issues) == 0 {
-						continue
-					}
-					err := collectReviews(ctx, c, client, res.Issues, reviews)
-					if err != nil {
-						panic(err)
-					}
-				}
-			}
-
-			rs := reviewSlice{}
-			for user, r := range reviews {
-				rs = append(rs, struct {
-					review
-					user string
-				}{r, user})
-			}
-			// Highest score ranks first.
-			sort.Sort(sort.Reverse(rs))
-
-			// To keep message short we only send top 5 reviewer.
-			topN := 5
-			buf := strings.Builder{}
-			for i, r := range rs {
-				user, review := r.user, r.review
-				reviewStr := review.String()
-				if len(reviewStr) == 0 {
-					// The user does not review.
-					continue
-				}
-				trophy := fmt.Sprint("#", i+1)
-				switch i {
-				case 0:
-					trophy = "🏆"
-				case 1:
-					trophy = "🥈"
-				case 2:
-					trophy = "🥉"
-				}
-
-				userReview := fmt.Sprintf("%s **%s**\n%s\n\n",
-					markdown.Escape(trophy), markdown.Escape(user), markdown.Escape(review.String()))
-				log.Info(userReview)
-				if i >= topN {
-					continue
-				}
-				buf.WriteString(userReview)
-			}
-			if buf.Len() == 0 {
-				buf.WriteString("No reviews 😢")
-			}
-			log.Debug("reviews: ", buf.String())
-			bot := feishu.WebhookBot(cfg.FeishuWebhookToken)
-			return bot.SendMarkdownMessage(ctx, fmt.Sprintf("Review Top %d 👍", topN), buf.String(), feishu.TitleColorGreen)
+			return reviewRange(cmd, args, lastWeekday, today)
 		},
 	}
+
+	command.AddCommand(&cobra.Command{
+		Use:   "monthly",
+		Short: "Collect monthly reviews 👍",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			today := time.Now()
+			firstDayThisMonth := time.Date(
+				today.Year(), today.Month(), 1,
+				today.Hour(), today.Minute(), today.Second(), 0, today.Location(),
+			).Add(-24 * time.Hour)
+
+			return reviewRange(cmd, args, firstDayThisMonth, today)
+		},
+	})
 	return command
+}
+
+func reviewRange(cmd *cobra.Command, args []string, start, end time.Time) error {
+	cfgPath, err := cmd.Flags().GetString("config")
+	if err != nil {
+		return err
+	}
+	cfg1, err := config.ReadConfig(cfgPath)
+	if err != nil {
+		return err
+	}
+	cfg := cfg1.Review
+	ctx := context.Background()
+	client := github.NewClient(oauth2.NewClient(ctx, oauth2.StaticTokenSource(
+		&oauth2.Token{AccessToken: cfg.GithubToken},
+	)))
+
+	reviews := make(map[string]review)
+	for next := (time.Time{}); !start.After(end); start = next {
+		next = start.Add(24 * time.Hour)
+
+		// Date if formated in time.RFC3339.
+		// updated:2021-05-23T21:00:00+08:00..2021-05-24T21:00:00+08:00
+		updateRange := fmt.Sprintf(" updated:%s..%s", start.Format(time.RFC3339), next.Format(time.RFC3339))
+		projects := make(map[string][]*github.IssuesSearchResult)
+		for _, proj := range cfg.Repos {
+			for _, query := range proj.PRQuery {
+				query = strings.TrimSpace(query)
+				query += updateRange
+				log.Info("query: ", query)
+				results, err := gh.SearchIssues(ctx, client, query)
+				if err != nil {
+					return err
+				}
+				projects[proj.Name] = append(projects[proj.Name], results...)
+			}
+		}
+
+		c := &reviewConfig{
+			lgtmComments:   cfg.LGTMComments,
+			blockComments:  cfg.BlockComments,
+			blockUsers:     cfg.BlockUsers,
+			blockLabels:    cfg.BlockLabels,
+			startTimestamp: start,
+			endTimestamp:   next,
+		}
+		log.Debug("projects issues: ", debug.PrettyFormat(projects))
+		for repo, results := range projects {
+			_ = repo
+			for _, res := range results {
+				if len(res.Issues) == 0 {
+					continue
+				}
+				err := collectReviews(ctx, c, client, res.Issues, reviews)
+				if err != nil {
+					panic(err)
+				}
+			}
+		}
+		log.Infof("reviews: %v", reviews)
+	}
+
+	rs := reviewSlice{}
+	for user, r := range reviews {
+		rs = append(rs, struct {
+			review
+			user string
+		}{r, user})
+	}
+	// Highest score ranks first.
+	sort.Sort(sort.Reverse(rs))
+
+	// To keep message short we only send top 5 reviewer.
+	topN := 5
+	buf := strings.Builder{}
+	for i, r := range rs {
+		user, review := r.user, r.review
+		reviewStr := review.String()
+		if len(reviewStr) == 0 {
+			// The user does not review.
+			continue
+		}
+		trophy := fmt.Sprint("#", i+1)
+		switch i {
+		case 0:
+			trophy = "🏆"
+		case 1:
+			trophy = "🥈"
+		case 2:
+			trophy = "🥉"
+		}
+
+		userReview := fmt.Sprintf("%s **%s**\n%s\n\n",
+			markdown.Escape(trophy), markdown.Escape(user), markdown.Escape(review.String()))
+		log.Info(userReview)
+		if i >= topN {
+			continue
+		}
+		buf.WriteString(userReview)
+	}
+	if buf.Len() == 0 {
+		buf.WriteString("No reviews 😢")
+	}
+	log.Debug("reviews: ", buf.String())
+	bot := feishu.WebhookBot(cfg.FeishuWebhookToken)
+	return bot.SendMarkdownMessage(ctx, fmt.Sprintf("Review Top %d 👍", topN), buf.String(), feishu.TitleColorGreen)
 }
 
 type review struct {
