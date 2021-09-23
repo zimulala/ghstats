@@ -27,9 +27,24 @@ sort:created-desc
 """]
 
 [[ptal.repos]]
+name = "DM"
+pr-query = [
+# Open DM PR in pingcap/dm repo.
+# Excludes PRs that not ready.
+# Excludes PRs that ready to merge.
+# Excludes cherry-pick PRs.
+"""
+repo:pingcap/dm type:pr state:open \
+draft:false -label:do-not-merge/work-in-progress -label:do-not-merge/hold -label:status/WIP \
+-label:status/LGT2 -label:status/can-merge \
+-label:type/cherry-pick-for-release-2.0 -label:type/cherry-pick-for-release-1.0 \
+sort:created-desc
+"""]
+
+[[ptal.repos]]
 name = "BRIE"
 pr-query = [
-# Open BRIE PR in pingcap/br and tikv/tikv repo.
+# Open BRIE PR in pingcap/br, tikv/tikv and pingcap/tidb repo.
 # Excludes PRs that not ready.
 # Excludes PRs that ready to merge.
 # Excludes cherry-pick PRs.
@@ -54,21 +69,6 @@ draft:false -label:do-not-merge/work-in-progress -label:do-not-merge/hold \
 sort:created-desc
 """]
 
-[[ptal.repos]]
-name = "DM"
-pr-query = [
-# Open DM PR in pingcap/dm repo.
-# Excludes PRs that not ready.
-# Excludes PRs that ready to merge.
-# Excludes cherry-pick PRs.
-"""
-repo:pingcap/dm type:pr state:open \
-draft:false -label:do-not-merge/work-in-progress -label:do-not-merge/hold \
--label:status/LGT2 -label:status/can-merge \
--label:type/cherry-pick-for-release-2.0 -label:type/cherry-pick-for-release-1.0 \
-sort:created-desc
-"""]
-
 [review]
 lgtm-comments = [
   "/lgtm",
@@ -77,7 +77,7 @@ lgtm-comments = [
 block-comments = [
   "/run-",
   "/merge",
-  "/rebuild",
+  "/rebuild"
 ]
 block-users = [
   "sre-bot",
@@ -109,18 +109,21 @@ repo:tikv/tikv label:component/CDC
 [[review.repos]]
 name = "BRIE"
 pr-query = [
-# Open BRIE PR and issues in pingcap/ticdc and tikv/tikv repo.
+# Open BRIE PR and issues in pingcap/br, tikv/tikv and pingcap/tidb repo.
 """
 repo:pingcap/br
 """,
 """
 repo:tikv/tikv label:component/backup-restore
+""",
+"""
+repo:pingcap/tidb label:component/lightning,label:component/br
 """]
 
 [[review.repos]]
 name = "DM"
 pr-query = [
-# Open MD PR and issues in pingcap/dn repo.
+# Open DM PR and issues in pingcap/dm repo.
 """
 repo:pingcap/dm
 """]
