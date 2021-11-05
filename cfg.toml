@@ -101,7 +101,7 @@ name = "TiCDC"
 pr-query = [
 # Open CDC PR and issues in pingcap/ticdc and tikv/tikv repo.
 """
-repo:pingcap/ticdc
+repo:pingcap/ticdc -label:area/dm
 """,
 """
 repo:tikv/tikv label:component/CDC
@@ -124,7 +124,10 @@ repo:pingcap/tidb label:component/lightning,label:component/br
 [[review.repos]]
 name = "DM"
 pr-query = [
-# Open DM PR and issues in pingcap/dm repo.
+# Open DM PR and issues in pingcap/dm and pingcap/ticdc repo.
 """
 repo:pingcap/dm
+""",
+"""
+repo:pingcap/ticdc label:area/dm
 """]
