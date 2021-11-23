@@ -1,4 +1,16 @@
 [review]
+allow-users = [
+  "nolouch",
+  "HunDunDM",
+  "rleungx",
+  "disksing",
+  "JmPotato",
+  "lhy1024",
+  "AndreMouche",
+  "bufferflies",
+  "CabinfeverB",
+  "Yisaer",
+]
 block-comments = [
   "/run-",
   "/merge",
@@ -36,6 +48,15 @@ pr-query = [
   # Open PD PR and issues in tikv/pd repo.
   """
 repo:tikv/pd
+""",
+  """
+repo:tikv/client-go
+""",
+  """
+repo:tikv/tikv
+""",
+  """
+repo:pingcap/tidb
 """,
 ]
 

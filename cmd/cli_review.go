@@ -58,7 +58,7 @@ func newReviewCommand() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			today := time.Now()
 			firstDayLastMonth := time.Date(
-				today.Year(), today.Month()-1, 1,
+				today.Year(), today.Month()-1, today.Day(),
 				today.Hour(), today.Minute(), today.Second(), 0, today.Location(),
 			)
 
@@ -109,6 +109,7 @@ func reviewRange(cmd *cobra.Command, args []string, start, end time.Time) error 
 		c := &reviewConfig{
 			lgtmComments:   cfg.LGTMComments,
 			blockComments:  cfg.BlockComments,
+			allowUsers:     cfg.AllowUsers,
 			blockUsers:     cfg.BlockUsers,
 			blockLabels:    cfg.BlockLabels,
 			startTimestamp: start,
@@ -241,6 +242,7 @@ func (x reviewSlice) Swap(i, j int)      { x[i], x[j] = x[j], x[i] }
 type reviewConfig struct {
 	lgtmComments   []string
 	blockComments  []string
+	allowUsers     []string
 	blockUsers     []string
 	blockLabels    []string
 	startTimestamp time.Time
@@ -250,6 +252,15 @@ type reviewConfig struct {
 // Is the ts within [start, end)?
 func (c *reviewConfig) withinTimeRange(ts time.Time) bool {
 	return (ts.After(c.startTimestamp) || ts.Equal(c.startTimestamp)) && ts.Before(c.endTimestamp)
+}
+
+func (c *reviewConfig) isUserAllowed(userLogin string) bool {
+	for i := range c.allowUsers {
+		if c.allowUsers[i] == userLogin {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *reviewConfig) isUserBlocked(userLogin string) bool {
@@ -317,7 +328,7 @@ func collectReviews(
 		collectPRLGTM,
 		collectPRReviewComments,
 		collectIssueAndPRComments,
-		collectAddLabels,
+		// collectAddLabels,
 	}
 	for _, collect := range collectors {
 		err := collect(ctx, c, client, issues, reviews)
@@ -346,6 +357,12 @@ func collectPRLGTM(
 		}
 		log.Debug("LGTM: ", debug.PrettyFormat(prReviews))
 		for _, prReview := range prReviews {
+			if prReview == nil || prReview.User == nil || prReview.User.Login == nil {
+				continue
+			}
+			if !c.isUserAllowed(*prReview.User.Login) {
+				continue
+			}
 			if c.isUserBlocked(*prReview.User.Login) {
 				continue
 			}
@@ -383,6 +400,12 @@ func collectPRReviewComments(
 		}
 		log.Debug("reviews: ", debug.PrettyFormat(prReviews))
 		for _, prReview := range prReviews {
+			if prReview == nil || prReview.User == nil || prReview.User.Login == nil {
+				continue
+			}
+			if !c.isUserAllowed(*prReview.User.Login) {
+				continue
+			}
 			if c.isUserBlocked(*prReview.User.Login) {
 				continue
 			}
@@ -422,6 +445,12 @@ func collectIssueAndPRComments(
 		}
 		log.Debug("comments: ", debug.PrettyFormat(comments))
 		for _, comment := range comments {
+			if comment == nil || comment.User == nil || comment.User.Login == nil {
+				continue
+			}
+			if !c.isUserAllowed(*comment.User.Login) {
+				continue
+			}
 			if c.isUserBlocked(*comment.User.Login) {
 				continue
 			}
@@ -455,6 +484,12 @@ func collectIssueCreates(
 	ctx context.Context, c *reviewConfig, client *github.Client, issues []*github.Issue, reviews map[string]review,
 ) error {
 	for _, issue := range issues {
+		if issue == nil || issue.User == nil || issue.User.Login == nil {
+			continue
+		}
+		if !c.isUserAllowed(*issue.User.Login) {
+			continue
+		}
 		if c.isUserBlocked(*issue.User.Login) {
 			continue
 		}
@@ -482,6 +517,12 @@ func collectAddLabels(
 		}
 		log.Debug("labels issue events: ", debug.PrettyFormat(events))
 		for _, event := range events {
+			if event == nil || event.Actor == nil || event.Actor.Login == nil {
+				continue
+			}
+			if !c.isUserAllowed(*event.Actor.Login) {
+				continue
+			}
 			if c.isUserBlocked(*event.Actor.Login) {
 				continue
 			}

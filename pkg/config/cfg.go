@@ -54,6 +54,7 @@ type Review struct {
 	Repos         []Repo   `toml:"repos"`
 	LGTMComments  []string `toml:"lgtm-comments"`
 	BlockComments []string `toml:"block-comments"`
+	AllowUsers    []string `toml:"allow-users"`
 	BlockUsers    []string `toml:"block-users"`
 	BlockLabels   []string `toml:"block-labels"`
 }
