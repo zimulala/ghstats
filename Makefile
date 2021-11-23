@@ -22,5 +22,8 @@ build: tidy
 tidy:
 	$(GO) mod tidy
 
-review: build
+run-daily-review: build
 	./bin/gh -c cfg.toml review
+
+run-monthly-review: build
+	./bin/gh -c cfg.toml review monthly

@@ -2,8 +2,8 @@ name: Daily Github Review Stats of tikv/pd Repo
 
 on:
   schedule:
-    # UTC+8 18:00
-    - cron: "0 10 * * *"
+    # UTC+8 18:00 on every day-of-week from Monday through Friday
+    - cron: "0 10 * * 1-5"
   workflow_dispatch:
 
 jobs:
@@ -15,7 +15,7 @@ jobs:
         with:
           go-version: "1.17.2"
       - run: |
-          make review
+          make run-daily-review
         env:
           GHSTATS_GITHUB_TOKEN: ${{ secrets.GHSTATS_GITHUB_TOKEN }}
           GHSTATS_FEISHU_WEBHOOK_TOKEN: ${{ secrets.GHSTATS_FEISHU_WEBHOOK_TOKEN }}

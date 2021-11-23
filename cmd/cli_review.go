@@ -34,15 +34,18 @@ func newReviewCommand() *cobra.Command {
 			today := time.Now()
 			lastWeekday := today
 			switch today.Weekday() {
-			// 2-5, collect 24 hour review activity.
-			case time.Tuesday, time.Wednesday, time.Thursday, time.Friday:
-				lastWeekday = lastWeekday.Add(-24 * time.Hour)
-			// 6, collect past 2 day review activity.
-			case time.Saturday:
-				lastWeekday = lastWeekday.Add(-2 * 24 * time.Hour)
-			// 0-1, collect past 3 day review activity. 0: Sunday, 1: Monday.
-			case time.Sunday, time.Monday:
+			// 1, collect past 3 days review activity.
+			case time.Monday:
 				lastWeekday = lastWeekday.Add(-3 * 24 * time.Hour)
+			// 2-4, collect past 1 day review activity.
+			case time.Tuesday, time.Wednesday, time.Thursday:
+				lastWeekday = lastWeekday.Add(-24 * time.Hour)
+			// 5, collect past 5 days review activity.
+			case time.Friday:
+				lastWeekday = lastWeekday.Add(-5 * 24 * time.Hour)
+			// 6-0, collect past week review activity.
+			case time.Saturday, time.Sunday:
+				lastWeekday = lastWeekday.Add(-7 * 24 * time.Hour)
 			}
 
 			return reviewRange(cmd, args, lastWeekday, today)
@@ -54,12 +57,12 @@ func newReviewCommand() *cobra.Command {
 		Short: "Collect monthly reviews 👍",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			today := time.Now()
-			firstDayThisMonth := time.Date(
-				today.Year(), today.Month(), 1,
+			firstDayLastMonth := time.Date(
+				today.Year(), today.Month()-1, 1,
 				today.Hour(), today.Minute(), today.Second(), 0, today.Location(),
-			).Add(-24 * time.Hour)
+			)
 
-			return reviewRange(cmd, args, firstDayThisMonth, today)
+			return reviewRange(cmd, args, firstDayLastMonth, today)
 		},
 	})
 	return command
