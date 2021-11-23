@@ -1,133 +1,62 @@
-[ptal]
-[ptal.access]
-github-token = "<TOKEN>"
-# Test bot
-feishu-webhook-token = "<TOKEN>"
-
-[[ptal.repos]]
-name = "TiCDC"
-pr-query = [
-# Open CDC PR in pingcap/ticdc and tikv/tikv repo.
-# Excludes PRs that not ready.
-# Excludes PRs that ready to merge.
-# Excludes cherry-pick PRs.
-"""
-repo:pingcap/ticdc type:pr state:open \
-draft:false -label:do-not-merge/work-in-progress -label:do-not-merge/hold \
--label:status/LGT2 -label:status/can-merge \
--label:type/cherry-pick-for-release-5.0 -label:type/cherry-pick-for-release-4.0 \
-sort:created-desc
-""",
-"""
-repo:tikv/tikv type:pr state:open label:component/CDC \
-draft:false -label:do-not-merge/work-in-progress -label:do-not-merge/hold \
--label:status/LGT2 -label:status/can-merge \
--label:type/cherry-pick \
-sort:created-desc
-"""]
-
-[[ptal.repos]]
-name = "DM"
-pr-query = [
-# Open DM PR in pingcap/dm repo.
-# Excludes PRs that not ready.
-# Excludes PRs that ready to merge.
-# Excludes cherry-pick PRs.
-"""
-repo:pingcap/dm type:pr state:open \
-draft:false -label:do-not-merge/work-in-progress -label:do-not-merge/hold -label:status/WIP \
--label:status/LGT2 -label:status/can-merge \
--label:type/cherry-pick-for-release-2.0 -label:type/cherry-pick-for-release-1.0 \
-sort:created-desc
-"""]
-
-[[ptal.repos]]
-name = "BRIE"
-pr-query = [
-# Open BRIE PR in pingcap/br, tikv/tikv and pingcap/tidb repo.
-# Excludes PRs that not ready.
-# Excludes PRs that ready to merge.
-# Excludes cherry-pick PRs.
-"""
-repo:pingcap/br type:pr state:open \
-draft:false -label:do-not-merge/work-in-progress -label:do-not-merge/hold \
--label:status/LGT2 -label:status/can-merge \
--label:type/cherry-pick-for-release-5.0 -label:type/cherry-pick-for-release-4.0 \
-sort:created-desc
-""",
-"""
-repo:tikv/tikv type:pr state:open label:component/backup-restore \
-draft:false -label:do-not-merge/work-in-progress -label:do-not-merge/hold \
--label:status/LGT2 -label:status/can-merge \
--label:type/cherry-pick \
-sort:created-desc
-""",
-"""
-repo:pingcap/tidb type:pr state:open label:component/lightning,label:component/br \
-draft:false -label:do-not-merge/work-in-progress -label:do-not-merge/hold \
--label:status/LGT2 -label:status/can-merge \
-sort:created-desc
-"""]
-
 [review]
-lgtm-comments = [
-  "/lgtm",
-  "LGTM",
-]
 block-comments = [
   "/run-",
   "/merge",
-  "/rebuild"
-]
-block-users = [
-  "sre-bot",
-  "ti-chi-bot",
-  "ti-srebot",
-  "codecov-commenter",
-  "CLAassistant",
-  "hound[bot]"
+  "/rebuild",
 ]
 block-labels = [
   "cherry-pick-approved",
   "status/can-merge",
 ]
+block-users = [
+  "sre-bot",
+  "ti-chi-bot",
+  "ti-srebot",
+  "codecov",
+  "codecov[bot]",
+  "codecov-commenter",
+  "CLAassistant",
+  "hound[bot]",
+]
+lgtm-comments = [
+  "/lgtm",
+  "LGTM",
+]
 
+# Could also be set with the environment variable:
+#   - GHSTATS_GITHUB_TOKEN
+#   - GHSTATS_FEISHU_WEBHOOK_TOKEN
 [review.access]
-github-token = "<TOKEN>"
-feishu-webhook-token = "<TOKEN>"
+feishu-webhook-token = ""
+github-token = ""
 
 [[review.repos]]
-name = "TiCDC"
+name = "PD"
 pr-query = [
-# Open CDC PR and issues in pingcap/ticdc and tikv/tikv repo.
-"""
-repo:pingcap/ticdc -label:area/dm
+  # Open PD PR and issues in tikv/pd repo.
+  """
+repo:tikv/pd
 """,
-"""
-repo:tikv/tikv label:component/CDC
-"""]
+]
 
-[[review.repos]]
-name = "BRIE"
-pr-query = [
-# Open BRIE PR and issues in pingcap/br, tikv/tikv and pingcap/tidb repo.
-"""
-repo:pingcap/br
-""",
-"""
-repo:tikv/tikv label:component/backup-restore
-""",
-"""
-repo:pingcap/tidb label:component/lightning,label:component/br
-"""]
+# [ptal]
+# [ptal.access]
+# github-token = "<TOKEN>"
+# # Test bot
+# feishu-webhook-token = "<TOKEN>"
 
-[[review.repos]]
-name = "DM"
-pr-query = [
-# Open DM PR and issues in pingcap/dm and pingcap/ticdc repo.
-"""
-repo:pingcap/dm
-""",
-"""
-repo:pingcap/ticdc label:area/dm
-"""]
+# [[ptal.repos]]
+# name = "PD"
+# pr-query = [
+#   # Open PR in tikv/pd repo.
+#   # Excludes PRs that not ready.
+#   # Excludes PRs that ready to merge.
+#   # Excludes cherry-pick PRs.
+#   """
+# repo:tikv/pd type:pr state:open \
+# draft:false -label:do-not-merge/work-in-progress -label:do-not-merge/hold \
+# -label:status/LGT2 -label:status/can-merge \
+# -label:type/cherry-pick-for-release-5.0 -label:type/cherry-pick-for-release-4.0 \
+# sort:created-desc
+# """,
+# ]

@@ -40,7 +40,7 @@ func newReviewCommand() *cobra.Command {
 			// 6, collect past 2 day review activity.
 			case time.Saturday:
 				lastWeekday = lastWeekday.Add(-2 * 24 * time.Hour)
-			// 0-1, collect past 3 day review activity. 0: Firday, 1: Monday.
+			// 0-1, collect past 3 day review activity. 0: Sunday, 1: Monday.
 			case time.Sunday, time.Monday:
 				lastWeekday = lastWeekday.Add(-3 * 24 * time.Hour)
 			}
