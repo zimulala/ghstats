@@ -30,7 +30,6 @@ func newReviewCommand() *cobra.Command {
 		Use:   "review",
 		Short: "Collect reviews 👍",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Only collect 1 weekday review activity.
 			today := time.Now()
 			lastWeekday := today
 			switch today.Weekday() {
@@ -109,11 +108,17 @@ func reviewRange(cmd *cobra.Command, args []string, start, end time.Time) error 
 		c := &reviewConfig{
 			lgtmComments:   cfg.LGTMComments,
 			blockComments:  cfg.BlockComments,
-			allowUsers:     cfg.AllowUsers,
-			blockUsers:     cfg.BlockUsers,
 			blockLabels:    cfg.BlockLabels,
+			allowUsers:     make(map[string]bool, len(cfg.AllowUsers)),
+			blockUsers:     make(map[string]bool, len(cfg.BlockUsers)),
 			startTimestamp: start,
 			endTimestamp:   next,
+		}
+		for i := range cfg.AllowUsers {
+			c.allowUsers[cfg.AllowUsers[i]] = true
+		}
+		for i := range cfg.BlockUsers {
+			c.blockUsers[cfg.BlockUsers[i]] = true
 		}
 		log.Debug("projects issues: ", debug.PrettyFormat(projects))
 		for repo, results := range projects {
@@ -242,9 +247,9 @@ func (x reviewSlice) Swap(i, j int)      { x[i], x[j] = x[j], x[i] }
 type reviewConfig struct {
 	lgtmComments   []string
 	blockComments  []string
-	allowUsers     []string
-	blockUsers     []string
 	blockLabels    []string
+	allowUsers     map[string]bool
+	blockUsers     map[string]bool
 	startTimestamp time.Time
 	endTimestamp   time.Time
 }
@@ -254,32 +259,22 @@ func (c *reviewConfig) withinTimeRange(ts time.Time) bool {
 	return (ts.After(c.startTimestamp) || ts.Equal(c.startTimestamp)) && ts.Before(c.endTimestamp)
 }
 
-func (c *reviewConfig) isUserAllowed(userLogin string) bool {
-	for i := range c.allowUsers {
-		if c.allowUsers[i] == userLogin {
-			return true
-		}
-	}
-	return false
-}
-
+// If there is an allowing list, check it instead of the block list.
 func (c *reviewConfig) isUserBlocked(userLogin string) bool {
-	for i := range c.blockUsers {
-		if c.blockUsers[i] == userLogin {
-			return true
-		}
+	if len(c.allowUsers) > 0 {
+		return !c.allowUsers[userLogin]
 	}
-	return false
+	return c.blockUsers[userLogin]
 }
 
-func (c *reviewConfig) isLabelBlocked(labelName string) bool {
-	for i := range c.blockLabels {
-		if c.blockLabels[i] == labelName {
-			return true
-		}
-	}
-	return false
-}
+// func (c *reviewConfig) isLabelBlocked(labelName string) bool {
+// 	for i := range c.blockLabels {
+// 		if c.blockLabels[i] == labelName {
+// 			return true
+// 		}
+// 	}
+// 	return false
+// }
 
 func (c *reviewConfig) isCommentBlocked(comment string) bool {
 	// Unescapes common whitespace in github comments.
@@ -357,12 +352,6 @@ func collectPRLGTM(
 		}
 		log.Debug("LGTM: ", debug.PrettyFormat(prReviews))
 		for _, prReview := range prReviews {
-			if prReview == nil || prReview.User == nil || prReview.User.Login == nil {
-				continue
-			}
-			if !c.isUserAllowed(*prReview.User.Login) {
-				continue
-			}
 			if c.isUserBlocked(*prReview.User.Login) {
 				continue
 			}
@@ -400,12 +389,6 @@ func collectPRReviewComments(
 		}
 		log.Debug("reviews: ", debug.PrettyFormat(prReviews))
 		for _, prReview := range prReviews {
-			if prReview == nil || prReview.User == nil || prReview.User.Login == nil {
-				continue
-			}
-			if !c.isUserAllowed(*prReview.User.Login) {
-				continue
-			}
 			if c.isUserBlocked(*prReview.User.Login) {
 				continue
 			}
@@ -445,12 +428,6 @@ func collectIssueAndPRComments(
 		}
 		log.Debug("comments: ", debug.PrettyFormat(comments))
 		for _, comment := range comments {
-			if comment == nil || comment.User == nil || comment.User.Login == nil {
-				continue
-			}
-			if !c.isUserAllowed(*comment.User.Login) {
-				continue
-			}
 			if c.isUserBlocked(*comment.User.Login) {
 				continue
 			}
@@ -484,12 +461,6 @@ func collectIssueCreates(
 	ctx context.Context, c *reviewConfig, client *github.Client, issues []*github.Issue, reviews map[string]review,
 ) error {
 	for _, issue := range issues {
-		if issue == nil || issue.User == nil || issue.User.Login == nil {
-			continue
-		}
-		if !c.isUserAllowed(*issue.User.Login) {
-			continue
-		}
 		if c.isUserBlocked(*issue.User.Login) {
 			continue
 		}
@@ -504,44 +475,41 @@ func collectIssueCreates(
 	return nil
 }
 
-// Collect review.addLabes.
-func collectAddLabels(
-	ctx context.Context, c *reviewConfig, client *github.Client, issues []*github.Issue, reviews map[string]review,
-) error {
-	for _, issue := range issues {
-		owner, repo := gh.GetRepository(issue)
-		number := issue.GetNumber()
-		events, err := gh.IssuesListIssueEvents(ctx, client, owner, repo, number)
-		if err != nil {
-			return err
-		}
-		log.Debug("labels issue events: ", debug.PrettyFormat(events))
-		for _, event := range events {
-			if event == nil || event.Actor == nil || event.Actor.Login == nil {
-				continue
-			}
-			if !c.isUserAllowed(*event.Actor.Login) {
-				continue
-			}
-			if c.isUserBlocked(*event.Actor.Login) {
-				continue
-			}
-			if *event.Actor.Login == *issue.User.Login {
-				// Do not count author's label events.
-				continue
-			}
-			if *event.Event != "labeled" {
-				continue
-			}
-			if c.isLabelBlocked(*event.Label.Name) {
-				continue
-			}
-			if c.withinTimeRange(*event.CreatedAt) {
-				review := reviews[*event.Actor.Login]
-				review.labelAdds++
-				reviews[*event.Actor.Login] = review
-			}
-		}
-	}
-	return nil
-}
+// // Collect review.addLabes.
+// func collectAddLabels(
+// 	ctx context.Context, c *reviewConfig, client *github.Client, issues []*github.Issue, reviews map[string]review,
+// ) error {
+// 	for _, issue := range issues {
+// 		owner, repo := gh.GetRepository(issue)
+// 		number := issue.GetNumber()
+// 		events, err := gh.IssuesListIssueEvents(ctx, client, owner, repo, number)
+// 		if err != nil {
+// 			return err
+// 		}
+// 		log.Debug("labels issue events: ", debug.PrettyFormat(events))
+// 		for _, event := range events {
+// 			if event == nil || event.Actor == nil || event.Actor.Login == nil {
+// 				continue
+// 			}
+// 			if c.isUserBlocked(*event.Actor.Login) {
+// 				continue
+// 			}
+// 			if *event.Actor.Login == *issue.User.Login {
+// 				// Do not count author's label events.
+// 				continue
+// 			}
+// 			if *event.Event != "labeled" {
+// 				continue
+// 			}
+// 			if c.isLabelBlocked(*event.Label.Name) {
+// 				continue
+// 			}
+// 			if c.withinTimeRange(*event.CreatedAt) {
+// 				review := reviews[*event.Actor.Login]
+// 				review.labelAdds++
+// 				reviews[*event.Actor.Login] = review
+// 			}
+// 		}
+// 	}
+// 	return nil
+// }
