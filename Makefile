@@ -21,3 +21,6 @@ build: tidy
 
 tidy:
 	$(GO) mod tidy
+
+review: build
+	./bin/gh -c cfg.toml review
