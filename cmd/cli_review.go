@@ -20,6 +20,8 @@ import (
 	"golang.org/x/oauth2"
 )
 
+const timeFormat = "2006-01-02 15:04:05"
+
 func init() {
 	rootCmd.AddCommand(newReviewCommand())
 }
@@ -84,13 +86,13 @@ func reviewRange(cmd *cobra.Command, args []string, start, end time.Time) error 
 
 	log.Info("review range", start, end)
 
+	current := start
+	next := current.Add(24 * time.Hour)
 	reviews := make(map[string]review)
-	for next := (time.Time{}); !(start.Equal(end) || start.After(end)); start = next {
-		next = start.Add(24 * time.Hour)
-
+	for !(current.Equal(end) || current.After(end)) {
 		// Date if formated in time.RFC3339.
 		// updated:2021-05-23T21:00:00+08:00..2021-05-24T21:00:00+08:00
-		updateRange := fmt.Sprintf(" updated:%s..%s", start.Format(time.RFC3339), next.Format(time.RFC3339))
+		updateRange := fmt.Sprintf(" updated:%s..%s", current.Format(time.RFC3339), next.Format(time.RFC3339))
 		projects := make(map[string][]*github.IssuesSearchResult)
 		for _, proj := range cfg.Repos {
 			for _, query := range proj.PRQuery {
@@ -111,7 +113,7 @@ func reviewRange(cmd *cobra.Command, args []string, start, end time.Time) error 
 			blockLabels:    cfg.BlockLabels,
 			allowUsers:     make(map[string]bool, len(cfg.AllowUsers)),
 			blockUsers:     make(map[string]bool, len(cfg.BlockUsers)),
-			startTimestamp: start,
+			startTimestamp: current,
 			endTimestamp:   next,
 		}
 		for i := range cfg.AllowUsers {
@@ -133,6 +135,8 @@ func reviewRange(cmd *cobra.Command, args []string, start, end time.Time) error 
 				}
 			}
 		}
+		current = next
+		next = current.Add(24 * time.Hour)
 		log.Infof("reviews: %v", reviews)
 	}
 
@@ -177,6 +181,7 @@ func reviewRange(cmd *cobra.Command, args []string, start, end time.Time) error 
 	if buf.Len() == 0 {
 		buf.WriteString("No reviews 😢")
 	}
+	buf.WriteString(fmt.Sprintf("\n[%s, %s]", start.Format(timeFormat), end.Format(timeFormat)))
 	log.Debug("reviews: ", buf.String())
 	bot := feishu.WebhookBot(cfg.FeishuWebhookToken)
 	return bot.SendMarkdownMessage(ctx, fmt.Sprintf("Review Top %d 👍", topN), buf.String(), feishu.TitleColorGreen)
