@@ -181,7 +181,8 @@ func reviewRange(cmd *cobra.Command, args []string, start, end time.Time) error 
 	if buf.Len() == 0 {
 		buf.WriteString("No reviews 😢")
 	}
-	buf.WriteString(fmt.Sprintf("\n[%s, %s]", start.Format(timeFormat), end.Format(timeFormat)))
+	timezone := time.FixedZone("UTC+8", 8*3600)
+	buf.WriteString(fmt.Sprintf("\n[%s, %s]", start.In(timezone).Format(timeFormat), end.In(timezone).Format(timeFormat)))
 	log.Debug("reviews: ", buf.String())
 	bot := feishu.WebhookBot(cfg.FeishuWebhookToken)
 	return bot.SendMarkdownMessage(ctx, fmt.Sprintf("Review Top %d 👍", topN), buf.String(), feishu.TitleColorGreen)
