@@ -25,5 +25,8 @@ tidy:
 run-daily-review: build
 	./bin/gh -c cfg.toml review
 
+run-weekly-review: build
+	./bin/gh -c cfg.toml review weekly
+
 run-monthly-review: build
 	./bin/gh -c cfg.toml review monthly

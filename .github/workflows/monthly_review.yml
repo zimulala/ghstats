@@ -1,4 +1,4 @@
-name: Monthly Github Review Stats of tikv/pd Repo
+name: Monthly Github Review Stats of Scheduling Team
 
 on:
   schedule:

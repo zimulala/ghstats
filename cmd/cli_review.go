@@ -22,7 +22,10 @@ import (
 
 const timeFormat = "2006-01-02 15:04:05"
 
+var timeZone *time.Location
+
 func init() {
+	timeZone, _ = time.LoadLocation("Asia/Shanghai")
 	rootCmd.AddCommand(newReviewCommand())
 }
 
@@ -30,46 +33,54 @@ func init() {
 func newReviewCommand() *cobra.Command {
 	command := &cobra.Command{
 		Use:   "review",
-		Short: "Collect reviews 👍",
+		Short: "Collect daily reviews 👍",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			today := time.Now()
-			lastWeekday := today
+			today := time.Now().In(timeZone)
+			lastDay := today
 			switch today.Weekday() {
-			// 1, collect past 3 days review activity.
+			// Monday, collect past 3 days review activity.
 			case time.Monday:
-				lastWeekday = lastWeekday.Add(-3 * 24 * time.Hour)
-			// 2-4, collect past 1 day review activity.
-			case time.Tuesday, time.Wednesday, time.Thursday:
-				lastWeekday = lastWeekday.Add(-24 * time.Hour)
-			// 5, collect past 5 days review activity.
-			case time.Friday:
-				lastWeekday = lastWeekday.Add(-5 * 24 * time.Hour)
-			// 6-0, collect past week review activity.
-			case time.Saturday, time.Sunday:
-				lastWeekday = lastWeekday.Add(-7 * 24 * time.Hour)
+				lastDay = lastDay.Add(-3 * 24 * time.Hour)
+			// Others, collect past 1 day review activity.
+			default:
+				lastDay = lastDay.Add(-24 * time.Hour)
 			}
 
-			return reviewRange(cmd, args, lastWeekday, today)
+			return reviewRange(cmd, "Daily", lastDay, today)
 		},
 	}
+
+	command.AddCommand(&cobra.Command{
+		Use:   "weekly",
+		Short: "Collect weekly reviews 👍",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			today := time.Now().In(timeZone)
+			firstDayThisWeek := time.Date(
+				today.Year(), today.Month(), today.Day()-int(today.Weekday())+1,
+				10, 0, 0, 0, today.Location(),
+			)
+			// [UTC+8 10:00 on Monday this week, now]
+			return reviewRange(cmd, "Weekly", firstDayThisWeek, today)
+		},
+	})
 
 	command.AddCommand(&cobra.Command{
 		Use:   "monthly",
 		Short: "Collect monthly reviews 👍",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			today := time.Now()
+			today := time.Now().In(timeZone)
 			firstDayLastMonth := time.Date(
 				today.Year(), today.Month()-1, today.Day(),
-				today.Hour(), today.Minute(), today.Second(), 0, today.Location(),
+				10, 0, 0, 0, today.Location(),
 			)
-
-			return reviewRange(cmd, args, firstDayLastMonth, today)
+			// [UTC+8 10:00 on the first day of last month, now]
+			return reviewRange(cmd, "Monthly", firstDayLastMonth, today)
 		},
 	})
 	return command
 }
 
-func reviewRange(cmd *cobra.Command, args []string, start, end time.Time) error {
+func reviewRange(cmd *cobra.Command, kind string, start, end time.Time) error {
 	cfgPath, err := cmd.Flags().GetString("config")
 	if err != nil {
 		return err
@@ -181,11 +192,10 @@ func reviewRange(cmd *cobra.Command, args []string, start, end time.Time) error 
 	if buf.Len() == 0 {
 		buf.WriteString("No reviews 😢")
 	}
-	timezone := time.FixedZone("UTC+8", 8*3600)
-	buf.WriteString(fmt.Sprintf("\n[%s, %s]", start.In(timezone).Format(timeFormat), end.In(timezone).Format(timeFormat)))
+	buf.WriteString(fmt.Sprintf("\n[%s, %s]", start.Format(timeFormat), end.Format(timeFormat)))
 	log.Debug("reviews: ", buf.String())
 	bot := feishu.WebhookBot(cfg.FeishuWebhookToken)
-	return bot.SendMarkdownMessage(ctx, fmt.Sprintf("Review Top %d 👍", topN), buf.String(), feishu.TitleColorGreen)
+	return bot.SendMarkdownMessage(ctx, fmt.Sprintf("Review Top %d 👍 - %s", topN, kind), buf.String(), feishu.TitleColorGreen)
 }
 
 type review struct {
