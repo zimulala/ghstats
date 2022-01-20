@@ -4,9 +4,11 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/go-github/v35/github"
@@ -77,6 +79,23 @@ func newReviewCommand() *cobra.Command {
 			return reviewRange(cmd, "Monthly", firstDayLastMonth, today)
 		},
 	})
+
+	command.AddCommand(&cobra.Command{
+		Use:   "debug",
+		Short: "Collect reviews within the given time range 📅",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			start, err := time.Parse(timeFormat, args[0])
+			if err != nil {
+				return err
+			}
+			end, err := time.Parse(timeFormat, args[1])
+			if err != nil {
+				return err
+			}
+			return reviewRange(cmd, "Debug", start.In(timeZone), end.In(timeZone))
+		},
+	})
+
 	return command
 }
 
@@ -90,13 +109,27 @@ func reviewRange(cmd *cobra.Command, kind string, start, end time.Time) error {
 		return err
 	}
 	cfg := cfg1.Review
+	c := &reviewConfig{
+		lgtmComments:   cfg.LGTMComments,
+		blockComments:  cfg.BlockComments,
+		blockLabels:    cfg.BlockLabels,
+		allowUsers:     make(map[string]bool, len(cfg.AllowUsers)),
+		blockUsers:     make(map[string]bool, len(cfg.BlockUsers)),
+		startTimestamp: start,
+		endTimestamp:   end,
+	}
+	for i := range cfg.AllowUsers {
+		c.allowUsers[cfg.AllowUsers[i]] = true
+	}
+	for i := range cfg.BlockUsers {
+		c.blockUsers[cfg.BlockUsers[i]] = true
+	}
 	ctx := context.Background()
 	client := github.NewClient(oauth2.NewClient(ctx, oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: cfg.GithubToken},
 	)))
 
 	log.Info("review range", start, end)
-
 	current := start
 	next := current.Add(24 * time.Hour)
 	reviews := make(map[string]review)
@@ -116,22 +149,6 @@ func reviewRange(cmd *cobra.Command, kind string, start, end time.Time) error {
 				}
 				projects[proj.Name] = append(projects[proj.Name], results...)
 			}
-		}
-
-		c := &reviewConfig{
-			lgtmComments:   cfg.LGTMComments,
-			blockComments:  cfg.BlockComments,
-			blockLabels:    cfg.BlockLabels,
-			allowUsers:     make(map[string]bool, len(cfg.AllowUsers)),
-			blockUsers:     make(map[string]bool, len(cfg.BlockUsers)),
-			startTimestamp: current,
-			endTimestamp:   next,
-		}
-		for i := range cfg.AllowUsers {
-			c.allowUsers[cfg.AllowUsers[i]] = true
-		}
-		for i := range cfg.BlockUsers {
-			c.blockUsers[cfg.BlockUsers[i]] = true
 		}
 		log.Debug("projects issues: ", debug.PrettyFormat(projects))
 		for repo, results := range projects {
@@ -199,7 +216,7 @@ func reviewRange(cmd *cobra.Command, kind string, start, end time.Time) error {
 }
 
 type review struct {
-	// How many LTGM does one send?
+	// How many LGTM does one send?
 	prLGTMs int
 	// How many PR comments does one send?
 	prComments int
@@ -272,6 +289,7 @@ type reviewConfig struct {
 
 // Is the ts within [start, end)?
 func (c *reviewConfig) withinTimeRange(ts time.Time) bool {
+	ts = ts.In(timeZone)
 	return (ts.After(c.startTimestamp) || ts.Equal(c.startTimestamp)) && ts.Before(c.endTimestamp)
 }
 
@@ -282,15 +300,6 @@ func (c *reviewConfig) isUserBlocked(userLogin string) bool {
 	}
 	return c.blockUsers[userLogin]
 }
-
-// func (c *reviewConfig) isLabelBlocked(labelName string) bool {
-// 	for i := range c.blockLabels {
-// 		if c.blockLabels[i] == labelName {
-// 			return true
-// 		}
-// 	}
-// 	return false
-// }
 
 func (c *reviewConfig) isCommentBlocked(comment string) bool {
 	// Unescapes common whitespace in github comments.
@@ -327,33 +336,66 @@ func (c *reviewConfig) isCommentLGTM(comment string) bool {
 }
 
 type collector func(
-	ctx context.Context, c *reviewConfig, client *github.Client, issues []*github.Issue, reviews map[string]review,
+	ctx context.Context,
+	c *reviewConfig,
+	client *github.Client,
+	issues []*github.Issue,
+	reviews map[string]review,
+	locker *sync.Mutex,
 ) error
 
 // collect reviews for the given issues and PRs.
 func collectReviews(
-	ctx context.Context, c *reviewConfig, client *github.Client, issues []*github.Issue, reviews map[string]review,
+	ctx context.Context,
+	c *reviewConfig,
+	client *github.Client,
+	issues []*github.Issue,
+	reviews map[string]review,
 ) error {
 	collectors := []collector{
 		collectIssueCreates,
 		collectPRLGTM,
 		collectPRReviewComments,
 		collectIssueAndPRComments,
-		// collectAddLabels,
 	}
+	var (
+		errChan = make(chan error, len(collectors))
+		wg      sync.WaitGroup
+		lock    sync.Mutex
+	)
 	for _, collect := range collectors {
-		err := collect(ctx, c, client, issues, reviews)
+		wg.Add(1)
+		go func(collect collector) {
+			defer wg.Done()
+			if err := collect(ctx, c, client, issues, reviews, &lock); err != nil {
+				log.Error("collectReviews error: ", err)
+				errChan <- err
+			}
+		}(collect)
+	}
+	wg.Wait()
+	close(errChan)
+	var errs error
+	for err := range errChan {
 		if err != nil {
-			return err
+			if errs == nil {
+				errs = errors.New("collectReviews error(s): ")
+			}
+			errs = errors.New(errs.Error() + "; " + err.Error())
 		}
 	}
-	return nil
+	return errs
 }
 
 // Collect review.prLGTM.
 // LGTM is an APPROVED PR review or a review summary is LGTM.
 func collectPRLGTM(
-	ctx context.Context, c *reviewConfig, client *github.Client, issues []*github.Issue, reviews map[string]review,
+	ctx context.Context,
+	c *reviewConfig,
+	client *github.Client,
+	issues []*github.Issue,
+	reviews map[string]review,
+	locker *sync.Mutex,
 ) error {
 	for _, issue := range issues {
 		if !issue.IsPullRequest() {
@@ -378,10 +420,13 @@ func collectPRLGTM(
 			if !c.withinTimeRange(*prReview.SubmittedAt) {
 				continue
 			}
+			fmt.Printf("%s\n", debug.PrettyFormat(prReview))
 			if *prReview.State == "APPROVED" || c.isCommentLGTM(*prReview.Body) {
+				locker.Lock()
 				review := reviews[*prReview.User.Login]
 				review.prLGTMs++
 				reviews[*prReview.User.Login] = review
+				locker.Unlock()
 			}
 		}
 	}
@@ -390,7 +435,12 @@ func collectPRLGTM(
 
 // Collect review.prComments.
 func collectPRReviewComments(
-	ctx context.Context, c *reviewConfig, client *github.Client, issues []*github.Issue, reviews map[string]review,
+	ctx context.Context,
+	c *reviewConfig,
+	client *github.Client,
+	issues []*github.Issue,
+	reviews map[string]review,
+	locker *sync.Mutex,
 ) error {
 	for _, issue := range issues {
 		if !issue.IsPullRequest() {
@@ -420,9 +470,11 @@ func collectPRReviewComments(
 			if err != nil {
 				return err
 			}
+			locker.Lock()
 			review := reviews[*prReview.User.Login]
 			review.prComments += len(reviewComments)
 			reviews[*prReview.User.Login] = review
+			locker.Unlock()
 		}
 	}
 
@@ -432,7 +484,12 @@ func collectPRReviewComments(
 // Collect review.issueComments and review.prComments.
 // Also, collect review.prLGTM if a comment is LGTM.
 func collectIssueAndPRComments(
-	ctx context.Context, c *reviewConfig, client *github.Client, issues []*github.Issue, reviews map[string]review,
+	ctx context.Context,
+	c *reviewConfig,
+	client *github.Client,
+	issues []*github.Issue,
+	reviews map[string]review,
+	locker *sync.Mutex,
 ) error {
 	for _, issue := range issues {
 		owner, repo := gh.GetRepository(issue)
@@ -455,6 +512,7 @@ func collectIssueAndPRComments(
 				continue
 			}
 			if c.withinTimeRange(*comment.CreatedAt) || c.withinTimeRange(*comment.UpdatedAt) {
+				locker.Lock()
 				review := reviews[*comment.User.Login]
 				if issue.IsPullRequest() {
 					if c.isCommentLGTM(*comment.Body) {
@@ -466,6 +524,7 @@ func collectIssueAndPRComments(
 					review.issueComments++
 				}
 				reviews[*comment.User.Login] = review
+				locker.Unlock()
 			}
 		}
 	}
@@ -474,58 +533,26 @@ func collectIssueAndPRComments(
 
 // Collect review.issueCreates.
 func collectIssueCreates(
-	ctx context.Context, c *reviewConfig, client *github.Client, issues []*github.Issue, reviews map[string]review,
+	ctx context.Context,
+	c *reviewConfig,
+	client *github.Client,
+	issues []*github.Issue,
+	reviews map[string]review,
+	locker *sync.Mutex,
 ) error {
 	for _, issue := range issues {
 		if c.isUserBlocked(*issue.User.Login) {
 			continue
 		}
 		if c.withinTimeRange(*issue.CreatedAt) {
+			locker.Lock()
 			review := reviews[*issue.User.Login]
 			if !issue.IsPullRequest() {
 				review.issueCreates++
 			}
 			reviews[*issue.User.Login] = review
+			locker.Unlock()
 		}
 	}
 	return nil
 }
-
-// // Collect review.addLabes.
-// func collectAddLabels(
-// 	ctx context.Context, c *reviewConfig, client *github.Client, issues []*github.Issue, reviews map[string]review,
-// ) error {
-// 	for _, issue := range issues {
-// 		owner, repo := gh.GetRepository(issue)
-// 		number := issue.GetNumber()
-// 		events, err := gh.IssuesListIssueEvents(ctx, client, owner, repo, number)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		log.Debug("labels issue events: ", debug.PrettyFormat(events))
-// 		for _, event := range events {
-// 			if event == nil || event.Actor == nil || event.Actor.Login == nil {
-// 				continue
-// 			}
-// 			if c.isUserBlocked(*event.Actor.Login) {
-// 				continue
-// 			}
-// 			if *event.Actor.Login == *issue.User.Login {
-// 				// Do not count author's label events.
-// 				continue
-// 			}
-// 			if *event.Event != "labeled" {
-// 				continue
-// 			}
-// 			if c.isLabelBlocked(*event.Label.Name) {
-// 				continue
-// 			}
-// 			if c.withinTimeRange(*event.CreatedAt) {
-// 				review := reviews[*event.Actor.Login]
-// 				review.labelAdds++
-// 				reviews[*event.Actor.Login] = review
-// 			}
-// 		}
-// 	}
-// 	return nil
-// }

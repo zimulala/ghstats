@@ -45,7 +45,6 @@ github-token = ""
 [[review.repos]]
 name = "PD"
 pr-query = [
-  # Open PD PR and issues in tikv/pd repo.
   """
 repo:tikv/pd
 """,
@@ -58,26 +57,7 @@ repo:tikv/tikv
   """
 repo:pingcap/tidb
 """,
+  """
+repo:pingcap/kvproto
+""",
 ]
-
-# [ptal]
-# [ptal.access]
-# github-token = "<TOKEN>"
-# # Test bot
-# feishu-webhook-token = "<TOKEN>"
-
-# [[ptal.repos]]
-# name = "PD"
-# pr-query = [
-#   # Open PR in tikv/pd repo.
-#   # Excludes PRs that not ready.
-#   # Excludes PRs that ready to merge.
-#   # Excludes cherry-pick PRs.
-#   """
-# repo:tikv/pd type:pr state:open \
-# draft:false -label:do-not-merge/work-in-progress -label:do-not-merge/hold \
-# -label:status/LGT2 -label:status/can-merge \
-# -label:type/cherry-pick-for-release-5.0 -label:type/cherry-pick-for-release-4.0 \
-# sort:created-desc
-# """,
-# ]
