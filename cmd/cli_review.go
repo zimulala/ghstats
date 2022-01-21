@@ -136,7 +136,10 @@ func reviewRange(cmd *cobra.Command, kind string, start, end time.Time) error {
 	for !(current.Equal(end) || current.After(end)) {
 		// Date if formated in time.RFC3339.
 		// updated:2021-05-23T21:00:00+08:00..2021-05-24T21:00:00+08:00
-		updateRange := fmt.Sprintf(" updated:%s..%s", current.Format(time.RFC3339), next.Format(time.RFC3339))
+		currentRFC3339 := current.Format(time.RFC3339)
+		nextRFC3339 := next.Format(time.RFC3339)
+		updateRange := fmt.Sprintf(" updated:%s..%s", currentRFC3339, nextRFC3339)
+		fmt.Printf("[%s] %s -%s\n", time.Now().Format(time.RFC3339), kind, updateRange)
 		projects := make(map[string][]*github.IssuesSearchResult)
 		for _, proj := range cfg.Repos {
 			for _, query := range proj.PRQuery {
