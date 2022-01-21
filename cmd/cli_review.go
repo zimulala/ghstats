@@ -420,7 +420,6 @@ func collectPRLGTM(
 			if !c.withinTimeRange(*prReview.SubmittedAt) {
 				continue
 			}
-			fmt.Printf("%s\n", debug.PrettyFormat(prReview))
 			if *prReview.State == "APPROVED" || c.isCommentLGTM(*prReview.Body) {
 				locker.Lock()
 				review := reviews[*prReview.User.Login]
