@@ -4,11 +4,9 @@ package cmd
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/google/go-github/v35/github"
@@ -344,7 +342,6 @@ type collector func(
 	client *github.Client,
 	issues []*github.Issue,
 	reviews map[string]review,
-	locker *sync.Mutex,
 ) error
 
 // collect reviews for the given issues and PRs.
@@ -361,33 +358,13 @@ func collectReviews(
 		collectPRReviewComments,
 		collectIssueAndPRComments,
 	}
-	var (
-		errChan = make(chan error, len(collectors))
-		wg      sync.WaitGroup
-		lock    sync.Mutex
-	)
 	for _, collect := range collectors {
-		wg.Add(1)
-		go func(collect collector) {
-			defer wg.Done()
-			if err := collect(ctx, c, client, issues, reviews, &lock); err != nil {
-				log.Error("collectReviews error: ", err)
-				errChan <- err
-			}
-		}(collect)
-	}
-	wg.Wait()
-	close(errChan)
-	var errs error
-	for err := range errChan {
+		err := collect(ctx, c, client, issues, reviews)
 		if err != nil {
-			if errs == nil {
-				errs = errors.New("collectReviews error(s): ")
-			}
-			errs = errors.New(errs.Error() + "; " + err.Error())
+			return err
 		}
 	}
-	return errs
+	return nil
 }
 
 // Collect review.prLGTM.
@@ -398,7 +375,6 @@ func collectPRLGTM(
 	client *github.Client,
 	issues []*github.Issue,
 	reviews map[string]review,
-	locker *sync.Mutex,
 ) error {
 	for _, issue := range issues {
 		if !issue.IsPullRequest() {
@@ -424,11 +400,9 @@ func collectPRLGTM(
 				continue
 			}
 			if *prReview.State == "APPROVED" || c.isCommentLGTM(*prReview.Body) {
-				locker.Lock()
 				review := reviews[*prReview.User.Login]
 				review.prLGTMs++
 				reviews[*prReview.User.Login] = review
-				locker.Unlock()
 			}
 		}
 	}
@@ -442,7 +416,6 @@ func collectPRReviewComments(
 	client *github.Client,
 	issues []*github.Issue,
 	reviews map[string]review,
-	locker *sync.Mutex,
 ) error {
 	for _, issue := range issues {
 		if !issue.IsPullRequest() {
@@ -472,11 +445,9 @@ func collectPRReviewComments(
 			if err != nil {
 				return err
 			}
-			locker.Lock()
 			review := reviews[*prReview.User.Login]
 			review.prComments += len(reviewComments)
 			reviews[*prReview.User.Login] = review
-			locker.Unlock()
 		}
 	}
 
@@ -491,7 +462,6 @@ func collectIssueAndPRComments(
 	client *github.Client,
 	issues []*github.Issue,
 	reviews map[string]review,
-	locker *sync.Mutex,
 ) error {
 	for _, issue := range issues {
 		owner, repo := gh.GetRepository(issue)
@@ -514,7 +484,6 @@ func collectIssueAndPRComments(
 				continue
 			}
 			if c.withinTimeRange(*comment.CreatedAt) || c.withinTimeRange(*comment.UpdatedAt) {
-				locker.Lock()
 				review := reviews[*comment.User.Login]
 				if issue.IsPullRequest() {
 					if c.isCommentLGTM(*comment.Body) {
@@ -526,7 +495,6 @@ func collectIssueAndPRComments(
 					review.issueComments++
 				}
 				reviews[*comment.User.Login] = review
-				locker.Unlock()
 			}
 		}
 	}
@@ -540,20 +508,17 @@ func collectIssueCreates(
 	client *github.Client,
 	issues []*github.Issue,
 	reviews map[string]review,
-	locker *sync.Mutex,
 ) error {
 	for _, issue := range issues {
 		if c.isUserBlocked(*issue.User.Login) {
 			continue
 		}
 		if c.withinTimeRange(*issue.CreatedAt) {
-			locker.Lock()
 			review := reviews[*issue.User.Login]
 			if !issue.IsPullRequest() {
 				review.issueCreates++
 			}
 			reviews[*issue.User.Login] = review
-			locker.Unlock()
 		}
 	}
 	return nil
