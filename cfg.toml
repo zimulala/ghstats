@@ -1,6 +1,11 @@
 [review]
 allow-users = [
   "HuSharp",
+  "ywqzzy",
+  "hongyunyan",
+  "Lloyd-Pottiger",
+  "xzhangxian1008",
+  "Qiaolin-Yu",
 ]
 block-comments = [
   "/run-",
