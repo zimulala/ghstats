@@ -34,7 +34,7 @@ feishu-webhook-token = ""
 github-token = ""
 
 [[review.repos]]
-name = "PD"
+name = "NewBee"
 pr-query = [
   """
 repo:tikv/pd
@@ -50,5 +50,8 @@ repo:pingcap/tidb
 """,
   """
 repo:pingcap/kvproto
+""",
+  """
+repo:pingcap/tiflash
 """,
 ]
