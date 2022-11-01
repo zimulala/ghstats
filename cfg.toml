@@ -1,16 +1,6 @@
 [review]
 allow-users = [
-  "nolouch",
-  "HunDunDM",
-  "rleungx",
-  "disksing",
-  "JmPotato",
-  "lhy1024",
-  "AndreMouche",
-  "bufferflies",
-  "CabinfeverB",
-  "Yisaer",
-  "LLThomas",
+  "HuSharp",
 ]
 block-comments = [
   "/run-",
