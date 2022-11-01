@@ -6,6 +6,7 @@ allow-users = [
   "Lloyd-Pottiger",
   "xzhangxian1008",
   "Qiaolin-Yu",
+  "xhebox",
 ]
 block-comments = [
   "/run-",
