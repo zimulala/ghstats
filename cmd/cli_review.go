@@ -180,7 +180,7 @@ func reviewRange(cmd *cobra.Command, kind string, start, end time.Time) error {
 	sort.Sort(sort.Reverse(rs))
 
 	// To keep message short we only send top 5 reviewer.
-	topN := 5
+	topN := 20
 	buf := strings.Builder{}
 	for i, r := range rs {
 		user, review := r.user, r.review
