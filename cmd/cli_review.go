@@ -5,7 +5,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
@@ -176,11 +175,7 @@ func reviewRange(cmd *cobra.Command, kind string, start, end time.Time) error {
 			user string
 		}{r, user})
 	}
-	// Highest score ranks first.
-	sort.Sort(sort.Reverse(rs))
 
-	// To keep message short we only send top 5 reviewer.
-	topN := 20
 	buf := strings.Builder{}
 	for i, r := range rs {
 		user, review := r.user, r.review
@@ -190,21 +185,9 @@ func reviewRange(cmd *cobra.Command, kind string, start, end time.Time) error {
 			continue
 		}
 		trophy := fmt.Sprint("#", i+1)
-		switch i {
-		case 0:
-			trophy = "🏆"
-		case 1:
-			trophy = "🥈"
-		case 2:
-			trophy = "🥉"
-		}
-
 		userReview := fmt.Sprintf("%s **%s**\n%s\n\n",
 			markdown.Escape(trophy), markdown.Escape(user), markdown.Escape(review.String()))
 		log.Info(userReview)
-		if i >= topN {
-			continue
-		}
 		buf.WriteString(userReview)
 	}
 	if buf.Len() == 0 {
@@ -213,7 +196,7 @@ func reviewRange(cmd *cobra.Command, kind string, start, end time.Time) error {
 	buf.WriteString(fmt.Sprintf("\n[%s, %s]", start.Format(timeFormat), end.Format(timeFormat)))
 	log.Debug("reviews: ", buf.String())
 	bot := feishu.WebhookBot(cfg.FeishuWebhookToken)
-	return bot.SendMarkdownMessage(ctx, fmt.Sprintf("Review Top %d 👍 - %s", topN, kind), buf.String(), feishu.TitleColorGreen)
+	return bot.SendMarkdownMessage(ctx, fmt.Sprintf("ReviewBoard 👍 - %s", kind), buf.String(), feishu.TitleColorGreen)
 }
 
 type review struct {
