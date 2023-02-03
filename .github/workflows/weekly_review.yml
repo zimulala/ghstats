@@ -3,7 +3,7 @@ name: Weekly Github Review Stats of Compute A&E Team
 on:
   schedule:
     # UTC+8 14:00 on Friday.
-    - cron: "0 6 * * 5"
+    - cron: "0 4 * * 5"
   workflow_dispatch:
 
 jobs:
