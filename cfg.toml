@@ -67,17 +67,5 @@ repo:pingcap/kvproto
 """,
   """
 repo:pingcap/tiflash
-""",
-  """
-repo:pingcap/test-plan
-""",
-  """
-repo:pingcap/endless
-""",
-  """
-repo:pingcap/tipb
-""",
-  """
-repo:pingcap/tiflash-scripts
-""",
+"""
 ]
