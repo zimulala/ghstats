@@ -1,4 +1,4 @@
-name: Monthly Github Review Stats of Scheduling Team
+name: Monthly Github Review Stats of Compute A&E Team
 
 on:
   schedule:

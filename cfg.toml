@@ -1,12 +1,20 @@
 [review]
 allow-users = [
-  "HuSharp",
   "ywqzzy",
-  "hongyunyan",
-  "Lloyd-Pottiger",
   "xzhangxian1008",
   "Qiaolin-Yu",
-  "xhebox",
+  "yibin87",
+  "zanmato1984",
+  "guo-shaoge",
+  "bestwoody",
+  "SeaRise",
+  "XuHuaiyu",
+  "wshwsh12",
+  "windtalker",
+  "mengxin9014",
+  "solotzg",
+  "gengliqi",
+  "LittleFall",
 ]
 block-comments = [
   "/run-",
@@ -40,7 +48,7 @@ feishu-webhook-token = ""
 github-token = ""
 
 [[review.repos]]
-name = "NewBee"
+name = "Compute A&E"
 pr-query = [
   """
 repo:tikv/pd
@@ -59,5 +67,17 @@ repo:pingcap/kvproto
 """,
   """
 repo:pingcap/tiflash
+""",
+  """
+repo:pingcap/test-plan
+""",
+  """
+repo:pingcap/endless
+""",
+  """
+repo:pingcap/tipb
+""",
+  """
+repo:pingcap/tiflash-scripts
 """,
 ]
