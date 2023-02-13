@@ -67,5 +67,8 @@ repo:pingcap/kvproto
 """,
   """
 repo:pingcap/tiflash
+""",
+  """
+repo:pingcap/tiflash-scripts
 """
 ]
