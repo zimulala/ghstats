@@ -1,4 +1,4 @@
-name: Github Review Stats of Compute DDL Service Team
+name: Daily Github Review Stats of Compute DDL Service Team
 
 on:
   schedule:
