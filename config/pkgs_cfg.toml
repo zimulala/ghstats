@@ -1,0 +1,17 @@
+[ptal]
+allow-pkgs= [
+  "ddl",
+  "disttask",
+  "owner",
+]
+
+# Could also be set with the environment variable:
+#   - GHSTATS_GITHUB_TOKEN
+#   - GHSTATS_FEISHU_WEBHOOK_TOKEN
+[ptal.access]
+feishu-webhook-token = ""
+github-token = ""
+
+[[ptal.repos]]
+name = "Compute DDL"
+pr-owner-repo= "pingcap/tidb"

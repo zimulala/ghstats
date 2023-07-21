@@ -30,3 +30,12 @@ run-weekly-review: build
 
 run-monthly-review: build
 	./bin/gh -c cfg.toml review monthly
+
+run-daily-pkgs: build
+	./bin/gh -c config/pkgs_cfg.toml pkgs
+
+run-weekly-pkgs: build
+	./bin/gh -c config/pkgs_cfg.toml pkgs weekly
+
+run-monthly-pkgs: build
+	./bin/gh -c config/pkgs_cfg.toml pkgs monthly
