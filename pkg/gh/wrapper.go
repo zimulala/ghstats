@@ -21,6 +21,13 @@ func GetRepository(issue *github.Issue) (owner, repo string) {
 	return parts[len(parts)-2], parts[len(parts)-1]
 }
 
+// GetPRRepository returns a PR's repository owner and name of the issue.
+func GetPRRepository(pr *github.PullRequest) (owner, repo string) {
+	repositoryURL := *pr.URL
+	parts := strings.Split(repositoryURL, "/")
+	return parts[len(parts)-4], parts[len(parts)-3]
+}
+
 // SearchIssues wraps Search.Issues, supports pagination and rate limit.
 func SearchIssues(
 	ctx context.Context, client *github.Client, query string,
@@ -188,6 +195,79 @@ PAGINATION:
 		}
 	}
 	return events, nil
+}
+
+// PullRequestsList wraps PullRequests.List,
+// supports pagination and rate limit.
+func PullRequestsList(
+	ctx context.Context, client *github.Client, owner, repo string,
+) ([]*github.PullRequest, error) {
+	prs := make([]*github.PullRequest, 0)
+	opts := github.ListOptions{Page: 0}
+	prOpts := &github.PullRequestListOptions{
+		State:       "all",
+		Sort:        "created",
+		Direction:   "asc",
+		ListOptions: opts,
+	}
+
+PAGINATION:
+	for {
+	RATELIMIT:
+		for {
+			result, resp, err := client.PullRequests.List(
+				ctx, owner, repo, prOpts)
+			if rateLimited, err := handleAPIError(err); err != nil {
+				return nil, err
+			} else if rateLimited {
+				continue
+			}
+			if resp.StatusCode != http.StatusOK {
+				body, _ := ioutil.ReadAll(resp.Body)
+				return nil, fmt.Errorf("issue list comments error [%d] %s", resp.StatusCode, string(body))
+			}
+			prs = append(prs, result...)
+			if resp.NextPage == 0 {
+				break PAGINATION
+			}
+			prOpts.ListOptions.Page = resp.NextPage
+			break RATELIMIT
+		}
+	}
+	return prs, nil
+}
+
+// PullRequestsListFiles wraps PullRequests.ListFiles,
+// supports pagination and rate limit.
+func PullRequestsListFiles(
+	ctx context.Context, client *github.Client, owner, repo string, number int,
+) ([]*github.CommitFile, error) {
+	files := make([]*github.CommitFile, 0)
+	opts := &github.ListOptions{Page: 0}
+PAGINATION:
+	for {
+	RATELIMIT:
+		for {
+			result, resp, err := client.PullRequests.ListFiles(
+				ctx, owner, repo, number, opts)
+			if rateLimited, err := handleAPIError(err); err != nil {
+				return nil, err
+			} else if rateLimited {
+				continue
+			}
+			if resp.StatusCode != http.StatusOK {
+				body, _ := ioutil.ReadAll(resp.Body)
+				return nil, fmt.Errorf("issue list comments error [%d] %s", resp.StatusCode, string(body))
+			}
+			files = append(files, result...)
+			if resp.NextPage == 0 {
+				break PAGINATION
+			}
+			opts.Page = resp.NextPage
+			break RATELIMIT
+		}
+	}
+	return files, nil
 }
 
 func handleAPIError(err error) (rateLimited bool, e error) {

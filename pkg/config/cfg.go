@@ -14,7 +14,7 @@ const (
 
 // Config contains configuration options.
 type Config struct {
-	PTAL   `toml:"ptal"`
+	PTAL   `toml:"ptal"` // ptal and pkgs all use this configure.
 	Review `toml:"review"`
 }
 
@@ -39,14 +39,16 @@ func (a *Access) getFromEnv() {
 
 // Repo contains configuration options for Repo in PTAL command.
 type Repo struct {
-	Name    string   `toml:"name"`
-	PRQuery []string `toml:"pr-query"`
+	Name        string   `toml:"name"`
+	PRQuery     []string `toml:"pr-query"`
+	PROwnerRepo string   `toml:"pr-owner-repo"`
 }
 
 // PTAL contains configuration options for PTAL command.
 type PTAL struct {
-	Access `toml:"access"`
-	Repos  []Repo `toml:"repos"`
+	Access   `toml:"access"`
+	Repos    []Repo   `toml:"repos"`
+	Packages []string `toml:"allow-pkgs"`
 }
 
 type Review struct {
