@@ -1,3 +1,6 @@
+# Set it to true when we we only want to print logs locally.
+# print-msg-local = true
+
 [ptal]
 allow-pkgs= [
   "ddl",

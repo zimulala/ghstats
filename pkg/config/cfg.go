@@ -14,8 +14,9 @@ const (
 
 // Config contains configuration options.
 type Config struct {
-	PTAL   `toml:"ptal"` // ptal and pkgs all use this configure.
-	Review `toml:"review"`
+	PTAL           `toml:"ptal"` // ptal and pkgs all use this configure.
+	Review         `toml:"review"`
+	IsOnlyPrintMsg bool `toml:"print-msg-local"` // Check whether the message is only printed locally.
 }
 
 // Access contains access token for services.

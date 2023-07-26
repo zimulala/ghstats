@@ -40,7 +40,10 @@ const (
 )
 
 // WebhookBot is a feishu webhook bot.
-type WebhookBot string
+type WebhookBot struct {
+	Token  string
+	IsTest bool // If it's true, we only print the message to local.
+}
 
 // SendMarkdownMessage sends markdown message via feishu bot,
 // msg must be markdown escaped.
@@ -106,7 +109,12 @@ func (bot WebhookBot) SendMarkdownMessage(ctx context.Context, title, msg string
 			]
 		}
 	}`, string(title1), titleColor, string(msg1))
-	url := fmt.Sprintf("https://open.feishu.cn/open-apis/bot/v2/hook/%s", bot)
+	if bot.IsTest {
+		fmt.Printf("Print messages locally only: %s\n", payload)
+		return nil
+	}
+
+	url := fmt.Sprintf("https://open.feishu.cn/open-apis/bot/v2/hook/%s", bot.Token)
 	req, err := http.NewRequestWithContext(
 		ctx, http.MethodPost, url, strings.NewReader(payload))
 	req.Header.Add("Content-Type", "application/json")
