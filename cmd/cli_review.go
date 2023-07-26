@@ -195,7 +195,7 @@ func reviewRange(cmd *cobra.Command, kind string, start, end time.Time) error {
 	}
 	buf.WriteString(fmt.Sprintf("\n[%s, %s]", start.Format(timeFormat), end.Format(timeFormat)))
 	log.Debug("reviews: ", buf.String())
-	bot := feishu.WebhookBot(cfg.FeishuWebhookToken)
+	bot := feishu.WebhookBot{Token: cfg.FeishuWebhookToken, IsTest: cfg1.IsOnlyPrintMsg}
 	return bot.SendMarkdownMessage(ctx, fmt.Sprintf("ReviewBoard 👍 - %s", kind), buf.String(), feishu.TitleColorGreen)
 }
 

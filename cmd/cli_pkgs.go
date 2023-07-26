@@ -140,7 +140,7 @@ func getPRs(cmd *cobra.Command, kind string, start, end time.Time) error {
 		fmt.Println("No PR need to be reviewed.")
 		return nil
 	}
-	bot := feishu.WebhookBot(cfg.FeishuWebhookToken)
+	bot := feishu.WebhookBot{Token: cfg.FeishuWebhookToken, IsTest: cfg1.IsOnlyPrintMsg}
 	return bot.SendMarkdownMessage(ctx, fmt.Sprintf("PTAL Pkgs:%v ❤️ - %s", pInfo.packages, kind), buf.String(), feishu.TitleColorWathet)
 }
 

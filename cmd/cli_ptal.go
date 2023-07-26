@@ -85,7 +85,7 @@ func newPTALCommand() *cobra.Command {
 				// Good! No PR need to be reviewed.
 				return nil
 			}
-			bot := feishu.WebhookBot(cfg.FeishuWebhookToken)
+			bot := feishu.WebhookBot{Token: cfg.FeishuWebhookToken, IsTest: cfg1.IsOnlyPrintMsg}
 			return bot.SendMarkdownMessage(ctx, "PTAL ❤️", buf.String(), feishu.TitleColorWathet)
 		},
 	}
