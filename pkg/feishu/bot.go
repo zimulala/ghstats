@@ -48,37 +48,33 @@ type WebhookBot struct {
 // SendMarkdownMessage sends markdown message via feishu bot,
 // msg must be markdown escaped.
 //
-// {
-//   "msg_type": "interactive",
-//   "card": {
-//     "config": {
-//       "wide_screen_mode": true,
-//       "enable_forward": true
-//     },
-//     "elements": [
-//       {
-//         "tag": "div",
-//         "text": {
-//           "content": "",
-//           "tag": "lark_md"
-//         }
-//       }
-//     ],
-//     "header": {
-//       "title": {
-//         "content": "PTAL ❤️",
-//         "tag": "plain_text"
-//       }
-//     }
-//   }
-// }
+//	{
+//	  "msg_type": "interactive",
+//	  "card": {
+//	    "config": {
+//	      "wide_screen_mode": true,
+//	      "enable_forward": true
+//	    },
+//	    "elements": [
+//	      {
+//	        "tag": "div",
+//	        "text": {
+//	          "content": "",
+//	          "tag": "lark_md"
+//	        }
+//	      }
+//	    ],
+//	    "header": {
+//	      "title": {
+//	        "content": "PTAL ❤️",
+//	        "tag": "plain_text"
+//	      }
+//	    }
+//	  }
+//	}
 //
 // Source: https://open.feishu.cn/document/ukTMukTMukTM/ucTM5YjL3ETO24yNxkjN#4996824a
 func (bot WebhookBot) SendMarkdownMessage(ctx context.Context, title, msg string, titleColor TitleColor) error {
-	title1, err := json.Marshal(title)
-	if err != nil {
-		return err
-	}
 	msg1, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -108,7 +104,7 @@ func (bot WebhookBot) SendMarkdownMessage(ctx context.Context, title, msg string
 				}
 			]
 		}
-	}`, string(title1), titleColor, string(msg1))
+	}`, title, titleColor, string(msg1))
 	if bot.IsTest {
 		fmt.Printf("Print messages locally only: %s\n", payload)
 		return nil

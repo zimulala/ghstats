@@ -2,11 +2,7 @@
 # print-msg-local = true
 
 [ptal]
-allow-pkgs= [
-  "ddl",
-  "disttask",
-  "owner",
-]
+report-name= "SQL Data & Service"
 
 # Could also be set with the environment variable:
 #   - GHSTATS_GITHUB_TOKEN
@@ -16,5 +12,19 @@ feishu-webhook-token = ""
 github-token = ""
 
 [[ptal.repos]]
-name = "Compute DDL"
-pr-owner-repo= "pingcap/tidb"
+name = "tidb"
+pr-owner-repo = "pingcap/tidb"
+allow-pkgs = [
+  "ddl",
+  "disttask",
+  "owner",
+  "dumpling",
+  "br/pkg/lightning",
+]
+
+[[ptal.repos]]
+name = "tiflow"
+pr-owner-repo = "pingcap/tiflow"
+allow-pkgs = [
+  "dm",
+]

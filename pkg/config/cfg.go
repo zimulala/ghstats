@@ -3,6 +3,7 @@ package config
 import (
 	"io/ioutil"
 	"os"
+	"strings"
 
 	"github.com/pelletier/go-toml"
 )
@@ -42,14 +43,23 @@ func (a *Access) getFromEnv() {
 type Repo struct {
 	Name        string   `toml:"name"`
 	PRQuery     []string `toml:"pr-query"`
+	Packages    []string `toml:"allow-pkgs"`
 	PROwnerRepo string   `toml:"pr-owner-repo"`
 }
 
 // PTAL contains configuration options for PTAL command.
 type PTAL struct {
-	Access   `toml:"access"`
-	Repos    []Repo   `toml:"repos"`
-	Packages []string `toml:"allow-pkgs"`
+	Access     `toml:"access"`
+	ReportName string `toml:"report-name"`
+	Repos      []Repo `toml:"repos"`
+}
+
+func (ptal PTAL) ReposName() string {
+	names := make([]string, 0, len(ptal.Repos))
+	for _, repo := range ptal.Repos {
+		names = append(names, repo.Name)
+	}
+	return strings.Join(names, ", ")
 }
 
 type Review struct {
