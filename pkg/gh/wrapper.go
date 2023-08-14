@@ -200,16 +200,19 @@ PAGINATION:
 // PullRequestsList wraps PullRequests.List,
 // supports pagination and rate limit.
 func PullRequestsList(
-	ctx context.Context, client *github.Client, owner, repo string,
+	ctx context.Context, client *github.Client, owner, repo string, maxPages int,
 ) ([]*github.PullRequest, error) {
-	prs := make([]*github.PullRequest, 0)
+	prs := make([]*github.PullRequest, 0, 30)
 	opts := github.ListOptions{Page: 0}
 	prOpts := &github.PullRequestListOptions{
-		State:       "all",
-		Sort:        "created",
-		Direction:   "asc",
+		State: "all",
+		Sort:  "created",
+		// Change this value because you want to limit the number of PR pages created recently.
+		Direction:   "desc",
 		ListOptions: opts,
 	}
+	succCnt := 0
+	pageLimit := maxPages
 
 PAGINATION:
 	for {
@@ -227,7 +230,8 @@ PAGINATION:
 				return nil, fmt.Errorf("issue list comments error [%d] %s", resp.StatusCode, string(body))
 			}
 			prs = append(prs, result...)
-			if resp.NextPage == 0 {
+			succCnt++
+			if resp.NextPage == 0 || succCnt >= pageLimit {
 				break PAGINATION
 			}
 			prOpts.ListOptions.Page = resp.NextPage
