@@ -75,6 +75,10 @@ type WebhookBot struct {
 //
 // Source: https://open.feishu.cn/document/ukTMukTMukTM/ucTM5YjL3ETO24yNxkjN#4996824a
 func (bot WebhookBot) SendMarkdownMessage(ctx context.Context, title, msg string, titleColor TitleColor) error {
+	title1, err := json.Marshal(title)
+	if err != nil {
+		return err
+	}
 	msg1, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -104,7 +108,7 @@ func (bot WebhookBot) SendMarkdownMessage(ctx context.Context, title, msg string
 				}
 			]
 		}
-	}`, title, titleColor, string(msg1))
+	}`, title1, titleColor, string(msg1))
 	if bot.IsTest {
 		fmt.Printf("Print messages locally only: %s\n", payload)
 		return nil
